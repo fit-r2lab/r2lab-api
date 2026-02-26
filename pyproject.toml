@@ -1,0 +1,25 @@
+[project]
+name = "r2lab-api"
+version = "0.1.0"
+description = "R2Lab testbed management API — replaces PLCAPI"
+license = {text = "CC-BY-NC-4.0"}
+authors = [
+    {name = "Thierry Parmentelat", email = "thierry.parmentelat@inria.fr"},
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi[standard]",
+    "sqlmodel",
+    "psycopg2-binary",
+    "alembic",
+    "pyjwt",
+    "passlib[bcrypt]",
+    "pydantic-settings",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "httpx"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
