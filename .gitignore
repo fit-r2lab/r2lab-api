@@ -4,3 +4,7 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+*.log
+scripts/manual.sh
+former-data/
+.claude
