@@ -134,7 +134,8 @@ def create_lease(
     resource = db.get(Resource, body.resource_id)
     if not resource:
         raise HTTPException(status_code=404, detail="Resource not found")
-    if not db.get(Slice, body.slice_id):
+    sl = db.get(Slice, body.slice_id)
+    if not sl or sl.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Slice not found")
     if not _user_in_slice(db, current, body.slice_id):
         raise HTTPException(status_code=403,

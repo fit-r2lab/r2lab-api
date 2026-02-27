@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from typing import Optional
 
 from sqlmodel import Field, Relationship, SQLModel
 
@@ -15,11 +16,12 @@ class SliceMember(SQLModel, table=True):
 
 class Slice(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
-    name: str = Field(unique=True, index=True)
+    name: str = Field(index=True)
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc))
+    deleted_at: Optional[datetime] = Field(default=None)
 
     memberships: list[SliceMember] = Relationship(
         back_populates="slice",

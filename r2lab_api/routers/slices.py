@@ -12,6 +12,14 @@ from ..schemas import SliceCreate, SliceRead, SliceUpdate
 router = APIRouter(prefix="/slices", tags=["slices"])
 
 
+def _get_active_slice(db: Session, slice_id: int) -> Slice:
+    """Return the slice if it exists and is not soft-deleted, else 404."""
+    sl = db.get(Slice, slice_id)
+    if not sl or sl.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="Slice not found")
+    return sl
+
+
 def _slice_to_read(sl: Slice, db: Session) -> SliceRead:
     member_ids = [
         m.user_id
@@ -31,13 +39,15 @@ def list_slices(
     current: User = Depends(get_current_user),
 ):
     if current.is_admin:
-        slices = db.exec(select(Slice)).all()
+        slices = db.exec(
+            select(Slice).where(Slice.deleted_at == None)  # noqa: E711
+        ).all()
     else:
-        # regular users see only slices they belong to
         slices = db.exec(
             select(Slice)
             .join(SliceMember)
-            .where(SliceMember.user_id == current.id)
+            .where(SliceMember.user_id == current.id,
+                   Slice.deleted_at == None)  # noqa: E711
         ).all()
     return [_slice_to_read(s, db) for s in slices]
 
@@ -49,7 +59,12 @@ def create_slice(
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
-    existing = db.exec(select(Slice).where(Slice.name == body.name)).first()
+    existing = db.exec(
+        select(Slice).where(
+            Slice.name == body.name,
+            Slice.deleted_at == None,  # noqa: E711
+        )
+    ).first()
     if existing:
         raise HTTPException(status_code=409, detail="Slice name already taken")
     sl = Slice(name=body.name)
@@ -65,9 +80,7 @@ def get_slice(
     db: Session = Depends(get_db),
     _user: User = Depends(get_current_user),
 ):
-    sl = db.get(Slice, slice_id)
-    if not sl:
-        raise HTTPException(status_code=404, detail="Slice not found")
+    sl = _get_active_slice(db, slice_id)
     return _slice_to_read(sl, db)
 
 
@@ -78,9 +91,7 @@ def update_slice(
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
-    sl = db.get(Slice, slice_id)
-    if not sl:
-        raise HTTPException(status_code=404, detail="Slice not found")
+    sl = _get_active_slice(db, slice_id)
     if body.name is not None:
         sl.name = body.name
     sl.updated_at = datetime.now(timezone.utc)
@@ -96,10 +107,14 @@ def delete_slice(
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
-    sl = db.get(Slice, slice_id)
-    if not sl:
-        raise HTTPException(status_code=404, detail="Slice not found")
-    db.delete(sl)
+    sl = _get_active_slice(db, slice_id)
+    # clear memberships (they serve no purpose on a deleted slice)
+    for m in db.exec(
+        select(SliceMember).where(SliceMember.slice_id == sl.id)
+    ).all():
+        db.delete(m)
+    sl.deleted_at = datetime.now(timezone.utc)
+    db.add(sl)
     db.commit()
 
 
@@ -113,8 +128,7 @@ def add_member(
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
-    if not db.get(Slice, slice_id):
-        raise HTTPException(status_code=404, detail="Slice not found")
+    _get_active_slice(db, slice_id)
     if not db.get(User, user_id):
         raise HTTPException(status_code=404, detail="User not found")
     existing = db.exec(
@@ -136,6 +150,7 @@ def remove_member(
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
+    _get_active_slice(db, slice_id)
     member = db.exec(
         select(SliceMember)
         .where(SliceMember.slice_id == slice_id,
