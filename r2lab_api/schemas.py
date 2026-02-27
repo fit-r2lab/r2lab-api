@@ -3,7 +3,7 @@ from typing import Optional
 
 from pydantic import BaseModel, EmailStr
 
-from .models.user import UserStatus
+from .models.user import UserStatus, UserFamily
 
 
 # ---------- Auth ----------
@@ -28,11 +28,13 @@ class UserRead(BaseModel):
     email: str
     is_admin: bool
     status: UserStatus
+    family: UserFamily
     created_at: datetime
 
 class UserUpdate(BaseModel):
     password: Optional[str] = None
     is_admin: Optional[bool] = None
+    family: Optional[UserFamily] = None
 
 
 # ---------- SSH Keys ----------
