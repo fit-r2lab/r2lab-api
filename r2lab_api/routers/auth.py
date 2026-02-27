@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
 
-from ..auth import create_token, hash_password, verify_password
+from ..auth import (
+    create_token, hash_password, needs_rehash, verify_password,
+)
 from ..database import get_db
 from ..models.user import User, UserStatus
 from ..schemas import LoginRequest, RegisterRequest, TokenResponse
@@ -22,6 +24,11 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Account is {user.status.value}",
         )
+    # transparently upgrade legacy MD5-crypt hashes to bcrypt
+    if needs_rehash(user.password_hash):
+        user.password_hash = hash_password(body.password)
+        db.add(user)
+        db.commit()
     token = create_token(user.email)
     return TokenResponse(access_token=token)
 
