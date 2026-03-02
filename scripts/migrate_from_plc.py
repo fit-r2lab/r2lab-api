@@ -247,9 +247,16 @@ def migrate(plc_data: dict, dry_run: bool = False):
 
         # --- slices ---
         slice_id_to_new_id = {}  # PLC slice_id → new slice.id
+        name_to_new_id = {}     # dedup: PLC may have several IDs per name
         for s in plc_data["slices"]:
             sid = s["slice_id"]
             name = s["name"].strip()
+
+            # PLC can have duplicate names — reuse the first insert
+            if name in name_to_new_id:
+                slice_id_to_new_id[sid] = name_to_new_id[name]
+                continue
+
             deleted_at = None
             if s["is_deleted"]:
                 expires = to_utc(s["expires"])
@@ -268,10 +275,12 @@ def migrate(plc_data: dict, dry_run: bool = False):
                 status = "DELETED" if deleted_at else "active"
                 print(f"  [dry-run] slice: {name} ({status})")
                 slice_id_to_new_id[sid] = -sid
+                name_to_new_id[name] = -sid
                 continue
             db.add(sl)
             db.flush()
             slice_id_to_new_id[sid] = sl.id
+            name_to_new_id[name] = sl.id
 
         # catch-all slice for leases with NULL slice_id
         unknown_slice = db.exec(
@@ -302,8 +311,12 @@ def migrate(plc_data: dict, dry_run: bool = False):
         print(f"Slice memberships: {member_count}")
 
         # --- leases ---
-        lease_count = 0
+        # Collect, dedup, and resolve overlaps before inserting.
+        # PLC had 37 nodes so different slices legitimately overlapped;
+        # the new single-resource model forbids that (EXCLUDE constraint).
+        raw_leases = []
         null_slice_count = 0
+        orphan_count = 0
         for l in plc_data["leases"]:
             plc_sid = l["slice_id"]
             if plc_sid is None:
@@ -312,27 +325,81 @@ def migrate(plc_data: dict, dry_run: bool = False):
             else:
                 new_sid = slice_id_to_new_id.get(plc_sid)
                 if new_sid is None:
-                    continue  # orphan lease — slice not in dump
+                    orphan_count += 1
+                    continue
 
             t_from = to_utc(l["t_from"])
             t_until = to_utc(l["t_until"])
+            if t_from >= t_until:
+                continue
+            raw_leases.append((new_sid, t_from, t_until))
 
+        # 1) dedup exact duplicates (same slice + same time range)
+        seen = set()
+        deduped = []
+        for entry in raw_leases:
+            if entry not in seen:
+                seen.add(entry)
+                deduped.append(entry)
+        dup_count = len(raw_leases) - len(deduped)
+
+        # 2) sort by t_from so overlap resolution is deterministic
+        deduped.sort(key=lambda e: e[1])
+
+        # 3) resolve cross-slice overlaps by trimming at midpoint
+        #    (rounded down to 10-min granularity)
+        granularity = resource.granularity  # seconds
+        adjusted = []
+        overlap_count = 0
+        for sid, t_from, t_until in deduped:
+            for i, (a_sid, a_from, a_until) in enumerate(adjusted):
+                if a_from >= a_until:
+                    continue  # already zeroed out
+                if t_from >= a_until or a_from >= t_until:
+                    continue  # no overlap
+                # overlap — trim at midpoint
+                overlap_start = max(t_from, a_from)
+                overlap_end = min(t_until, a_until)
+                mid_ts = (overlap_start.timestamp()
+                          + overlap_end.timestamp()) / 2
+                mid_ts = mid_ts - (mid_ts % granularity)
+                mid = datetime.fromtimestamp(mid_ts, tz=timezone.utc)
+                # earlier lease gets the first half
+                if a_from <= t_from:
+                    adjusted[i] = (a_sid, a_from, min(a_until, mid))
+                    t_from = max(t_from, mid)
+                else:
+                    adjusted[i] = (a_sid, max(a_from, mid), a_until)
+                    t_until = min(t_until, mid)
+                overlap_count += 1
+            if t_from < t_until:
+                adjusted.append((sid, t_from, t_until))
+
+        # 4) insert
+        lease_count = 0
+        dropped = 0
+        for sid, t_from, t_until in adjusted:
+            if t_from >= t_until:
+                dropped += 1
+                continue
             if dry_run:
                 lease_count += 1
                 continue
-
-            lease = Lease(
+            db.add(Lease(
                 resource_id=resource.id,
-                slice_id=new_sid,
+                slice_id=sid,
                 t_from=t_from,
                 t_until=t_until,
-                created_at=t_from,  # best approximation
-            )
-            db.add(lease)
+                created_at=t_from,
+            ))
             lease_count += 1
 
-        print(f"Leases: {lease_count} "
-              f"({null_slice_count} with NULL slice → 'unknown-slice')")
+        print(f"Leases: {lease_count} inserted "
+              f"({dup_count} exact dups removed, "
+              f"{overlap_count} overlaps trimmed, "
+              f"{dropped} zeroed out, "
+              f"{null_slice_count} NULL→'unknown-slice', "
+              f"{orphan_count} orphaned)")
 
         # --- commit ---
         if dry_run:
