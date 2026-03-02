@@ -3,7 +3,8 @@ from typing import Optional
 
 from pydantic import BaseModel, EmailStr
 
-from .models.user import UserStatus, UserFamily
+from .models.slice import SliceFamily
+from .models.user import UserStatus
 
 
 # ---------- Auth ----------
@@ -28,13 +29,11 @@ class UserRead(BaseModel):
     email: str
     is_admin: bool
     status: UserStatus
-    family: UserFamily
     created_at: datetime
 
 class UserUpdate(BaseModel):
     password: Optional[str] = None
     is_admin: Optional[bool] = None
-    family: Optional[UserFamily] = None
 
 
 # ---------- SSH Keys ----------
@@ -55,14 +54,17 @@ class SSHKeyCreate(BaseModel):
 class SliceRead(BaseModel):
     id: int
     name: str
+    family: SliceFamily
     created_at: datetime
     member_ids: list[int] = []
 
 class SliceCreate(BaseModel):
     name: str
+    family: SliceFamily = SliceFamily.unknown
 
 class SliceUpdate(BaseModel):
     name: Optional[str] = None
+    family: Optional[SliceFamily] = None
 
 
 # ---------- Resources ----------

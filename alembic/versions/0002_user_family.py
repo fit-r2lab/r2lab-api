@@ -1,4 +1,4 @@
-"""add family column to user
+"""add family column to slice (not user)
 
 Revision ID: 0002
 Revises: 0001
@@ -19,11 +19,11 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     op.add_column(
-        "user",
+        "slice",
         sa.Column("family", sqlmodel.sql.sqltypes.AutoString,
                   nullable=False, server_default="unknown"),
     )
 
 
 def downgrade() -> None:
-    op.drop_column("user", "family")
+    op.drop_column("slice", "family")

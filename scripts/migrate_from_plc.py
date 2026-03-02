@@ -36,8 +36,8 @@ from r2lab_api.auth import hash_password
 from r2lab_api.database import engine
 from r2lab_api.models.lease import Lease
 from r2lab_api.models.resource import Resource
-from r2lab_api.models.slice import Slice, SliceMember
-from r2lab_api.models.user import SSHKey, User, UserFamily, UserStatus
+from r2lab_api.models.slice import Slice, SliceFamily, SliceMember
+from r2lab_api.models.user import SSHKey, User, UserStatus
 
 
 # ---------------------------------------------------------------------------
@@ -148,17 +148,13 @@ def derive_status(person: dict) -> UserStatus:
     return UserStatus.pending
 
 
-def derive_family(person_id: int, person_site: dict) -> UserFamily:
-    """Best-effort family guess from PLC site login_base."""
-    login_base = person_site.get(person_id)
-    if login_base is None:
-        return UserFamily.unknown
-    # known R2Lab/Inria sites
-    lb = login_base.lower()
-    if lb in ("inria", "inria_sophia", "r2lab"):
-        return UserFamily.academia_diana
-    # heuristic: most PLC sites are academic
-    return UserFamily.academia_others
+def derive_family(slice_name: str) -> SliceFamily:
+    """Best-effort family guess from the PLC slice name prefix."""
+    name = slice_name.lower()
+    if name.startswith("inria_"):
+        return SliceFamily.academia_diana
+    # heuristic: most PLC slices are academic
+    return SliceFamily.academia_others
 
 
 DISABLED_PASSWORD = hash_password("plc-migration-must-reset")
@@ -207,7 +203,6 @@ def migrate(plc_data: dict, dry_run: bool = False):
                 password_hash=pw_hash,
                 is_admin=is_admin,
                 status=derive_status(p),
-                family=derive_family(pid, plc_data["person_site"]),
                 created_at=to_utc(p["date_created"]),
                 updated_at=to_utc(p["last_updated"]),
             )
@@ -267,6 +262,7 @@ def migrate(plc_data: dict, dry_run: bool = False):
 
             sl = Slice(
                 name=name,
+                family=derive_family(name),
                 created_at=to_utc(s["created"]),
                 updated_at=to_utc(s["created"]),
                 deleted_at=deleted_at,

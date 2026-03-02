@@ -24,7 +24,7 @@ from r2lab_api.database import get_db
 from r2lab_api.models.lease import Lease          # noqa: F401 — registers table
 from r2lab_api.models.resource import Resource
 from r2lab_api.models.slice import Slice, SliceMember
-from r2lab_api.models.user import User, UserStatus, UserFamily
+from r2lab_api.models.user import User, UserStatus
 
 
 def _stamp_utc(instance, *_args):
@@ -87,7 +87,6 @@ def _make_user(db, *, email, is_admin=False, status=UserStatus.approved):
         password_hash=hash_password("password"),
         is_admin=is_admin,
         status=status,
-        family=UserFamily.admin if is_admin else UserFamily.academia_diana,
     )
     db.add(user)
     db.commit()

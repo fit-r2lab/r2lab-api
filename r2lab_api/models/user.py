@@ -11,22 +11,12 @@ class UserStatus(str, enum.Enum):
     disabled = "disabled"
 
 
-class UserFamily(str, enum.Enum):
-    unknown = "unknown"
-    admin = "admin"
-    academia_diana = "academia/diana"
-    academia_slices = "academia/slices"
-    academia_others = "academia/others"
-    industry = "industry"
-
-
 class User(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     email: str = Field(unique=True, index=True)
     password_hash: str
     is_admin: bool = Field(default=False)
     status: UserStatus = Field(default=UserStatus.pending)
-    family: UserFamily = Field(default=UserFamily.unknown)
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(
