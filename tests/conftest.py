@@ -87,7 +87,7 @@ def _make_user(db, *, email, is_admin=False, status=UserStatus.approved):
         password_hash=hash_password("password"),
         is_admin=is_admin,
         status=status,
-        family=UserFamily.admin if is_admin else UserFamily.local,
+        family=UserFamily.admin if is_admin else UserFamily.academia_diana,
     )
     db.add(user)
     db.commit()

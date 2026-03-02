@@ -14,8 +14,9 @@ class UserStatus(str, enum.Enum):
 class UserFamily(str, enum.Enum):
     unknown = "unknown"
     admin = "admin"
-    local = "local"
-    academic = "academic"
+    academia_diana = "academia/diana"
+    academia_slices = "academia/slices"
+    academia_others = "academia/others"
     industry = "industry"
 
 

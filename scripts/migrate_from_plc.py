@@ -156,9 +156,9 @@ def derive_family(person_id: int, person_site: dict) -> UserFamily:
     # known R2Lab/Inria sites
     lb = login_base.lower()
     if lb in ("inria", "inria_sophia", "r2lab"):
-        return UserFamily.local
+        return UserFamily.academia_diana
     # heuristic: most PLC sites are academic
-    return UserFamily.academic
+    return UserFamily.academia_others
 
 
 DISABLED_PASSWORD = hash_password("plc-migration-must-reset")
