@@ -45,7 +45,7 @@ from r2lab_api.models.slice import Slice, SliceFamily
 # SLICES_TO_SKIP = {"inria_r2lab.nightly", "inria_admin"}
 SLICES_TO_SKIP = set()  # no more skipping
 
-FORMER_DATA_DIR = Path(__file__).resolve().parent.parent / "former-data"
+RESTORE_DATA_DIR = Path(__file__).resolve().parent
 
 # Granularity in seconds (10 minutes) — must match resource.granularity
 GRANULARITY = 600
@@ -144,8 +144,8 @@ def migrate(dry_run: bool = False):
     now = utcnow()
 
     # ---- read CSV data ----
-    leases_csv = read_leases_csv(FORMER_DATA_DIR / "REBUILT-LEASES.csv")
-    family_map = read_family_csv(FORMER_DATA_DIR / "HAND-SLICE-FAMILY.csv")
+    leases_csv = read_leases_csv(RESTORE_DATA_DIR / "REBUILT-LEASES.csv")
+    family_map = read_family_csv(RESTORE_DATA_DIR / "HAND-SLICE-FAMILY.csv")
 
     print(f"CSV: {len(leases_csv)} leases (after skipping {SLICES_TO_SKIP})")
 
