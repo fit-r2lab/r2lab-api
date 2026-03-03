@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session, select
 
 from ..database import get_db
@@ -30,6 +30,7 @@ def _slice_to_read(sl: Slice, db: Session) -> SliceRead:
     return SliceRead(
         id=sl.id, name=sl.name, family=sl.family,
         created_at=sl.created_at, member_ids=member_ids,
+        deleted_at=sl.deleted_at,
     )
 
 
@@ -37,18 +38,20 @@ def _slice_to_read(sl: Slice, db: Session) -> SliceRead:
 def list_slices(
     db: Session = Depends(get_db),
     current: User = Depends(get_current_user),
+    include_deleted: bool = Query(False),
 ):
     if current.is_admin:
-        slices = db.exec(
-            select(Slice).where(Slice.deleted_at == None)  # noqa: E711
-        ).all()
+        stmt = select(Slice)
+        if not include_deleted:
+            stmt = stmt.where(Slice.deleted_at == None)  # noqa: E711
     else:
-        slices = db.exec(
+        stmt = (
             select(Slice)
             .join(SliceMember)
             .where(SliceMember.user_id == current.id,
                    Slice.deleted_at == None)  # noqa: E711
-        ).all()
+        )
+    slices = db.exec(stmt).all()
     return [_slice_to_read(s, db) for s in slices]
 
 

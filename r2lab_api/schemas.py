@@ -57,6 +57,7 @@ class SliceRead(BaseModel):
     family: SliceFamily
     created_at: datetime
     member_ids: list[int] = []
+    deleted_at: Optional[datetime] = None
 
 class SliceCreate(BaseModel):
     name: str
