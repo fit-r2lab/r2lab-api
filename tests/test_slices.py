@@ -1,9 +1,9 @@
 """
-Slice soft-delete tests.
+Slice tests — soft-delete, deleted_at via PATCH, authorization.
 """
 from datetime import datetime, timezone, timedelta
 
-from tests.conftest import auth, _make_slice, _make_resource
+from tests.conftest import auth, _make_slice, _add_member, _make_resource
 
 
 T0 = datetime(2026, 3, 1, 10, 0, tzinfo=timezone.utc)
@@ -81,3 +81,100 @@ class TestSliceSoftDelete:
         r = client.get("/leases")
         lease_ids = [l["id"] for l in r.json()]
         assert lease_id in lease_ids
+
+
+# ---------- PATCH deleted_at ----------
+
+class TestSlicePatchDeletedAt:
+
+    def test_admin_can_set_deleted_at(
+        self, client, db, admin_token, slice_obj,
+    ):
+        future = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
+        r = client.patch(
+            f"/slices/{slice_obj.id}",
+            json={"deleted_at": future},
+            headers=auth(admin_token),
+        )
+        assert r.status_code == 200
+        assert r.json()["deleted_at"] is not None
+
+    def test_admin_can_set_deleted_at_far_future(
+        self, client, db, admin_token, slice_obj,
+    ):
+        """Admins have no 61-day restriction."""
+        far = (datetime.now(timezone.utc) + timedelta(days=365)).isoformat()
+        r = client.patch(
+            f"/slices/{slice_obj.id}",
+            json={"deleted_at": far},
+            headers=auth(admin_token),
+        )
+        assert r.status_code == 200
+
+    def test_member_can_set_deleted_at_within_61_days(
+        self, client, db, user_token, regular_user, member_slice,
+    ):
+        future = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
+        r = client.patch(
+            f"/slices/{member_slice.id}",
+            json={"deleted_at": future},
+            headers=auth(user_token),
+        )
+        assert r.status_code == 200
+        assert r.json()["deleted_at"] is not None
+
+    def test_member_rejected_deleted_at_beyond_61_days(
+        self, client, db, user_token, regular_user, member_slice,
+    ):
+        too_far = (datetime.now(timezone.utc) + timedelta(days=90)).isoformat()
+        r = client.patch(
+            f"/slices/{member_slice.id}",
+            json={"deleted_at": too_far},
+            headers=auth(user_token),
+        )
+        assert r.status_code == 422
+        assert "61 days" in r.json()["detail"]
+
+    def test_member_rejected_deleted_at_in_past(
+        self, client, db, user_token, regular_user, member_slice,
+    ):
+        past = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+        r = client.patch(
+            f"/slices/{member_slice.id}",
+            json={"deleted_at": past},
+            headers=auth(user_token),
+        )
+        assert r.status_code == 422
+        assert "future" in r.json()["detail"]
+
+    def test_member_cannot_change_name(
+        self, client, db, user_token, regular_user, member_slice,
+    ):
+        r = client.patch(
+            f"/slices/{member_slice.id}",
+            json={"name": "hacked"},
+            headers=auth(user_token),
+        )
+        assert r.status_code == 403
+
+    def test_member_cannot_change_family(
+        self, client, db, user_token, regular_user, member_slice,
+    ):
+        r = client.patch(
+            f"/slices/{member_slice.id}",
+            json={"family": "industry"},
+            headers=auth(user_token),
+        )
+        assert r.status_code == 403
+
+    def test_non_member_cannot_patch(
+        self, client, db, user_token, slice_obj,
+    ):
+        """regular_user is not a member of slice_obj."""
+        future = (datetime.now(timezone.utc) + timedelta(days=10)).isoformat()
+        r = client.patch(
+            f"/slices/{slice_obj.id}",
+            json={"deleted_at": future},
+            headers=auth(user_token),
+        )
+        assert r.status_code == 403

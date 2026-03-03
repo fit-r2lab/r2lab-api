@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session, select
@@ -99,20 +99,56 @@ def get_slice(
     return _slice_to_read(sl, db)
 
 
-@router.patch("/{slice_id}", response_model=SliceRead)
+@router.patch("/{slice_id}", response_model=SliceRead,
+              summary="Update a slice",
+              description=(
+                  "Admins can update any field. "
+                  "Slice members can only set `deleted_at` (expiry), "
+                  "and only to a date within the next 61 days."
+              ))
 def update_slice(
     slice_id: int,
     body: SliceUpdate,
     db: Session = Depends(get_db),
-    _admin: User = Depends(require_admin),
+    current: User = Depends(get_current_user),
 ):
     sl = _get_active_slice(db, slice_id)
+
+    if not current.is_admin:
+        # non-admin: must be a member
+        is_member = db.exec(
+            select(SliceMember)
+            .where(SliceMember.slice_id == slice_id,
+                   SliceMember.user_id == current.id)
+        ).first() is not None
+        if not is_member:
+            raise HTTPException(status_code=403, detail="Forbidden")
+        # non-admin can only touch deleted_at
+        if body.name is not None or body.family is not None or body.country is not None:
+            raise HTTPException(
+                status_code=403,
+                detail="Only admins can change name, family, or country")
+        # deleted_at must be within the next 61 days
+        if body.deleted_at is not None:
+            now = datetime.now(timezone.utc)
+            limit = now + timedelta(days=61)
+            if body.deleted_at < now:
+                raise HTTPException(
+                    status_code=422,
+                    detail="deleted_at must be in the future")
+            if body.deleted_at > limit:
+                raise HTTPException(
+                    status_code=422,
+                    detail="deleted_at must be within the next 61 days")
+
     if body.name is not None:
         sl.name = body.name
     if body.family is not None:
         sl.family = body.family
     if body.country is not None:
         sl.country = body.country
+    if body.deleted_at is not None:
+        sl.deleted_at = body.deleted_at
     sl.updated_at = datetime.now(timezone.utc)
     db.add(sl)
     db.commit()

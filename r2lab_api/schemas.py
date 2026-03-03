@@ -73,6 +73,7 @@ class SliceUpdate(BaseModel):
     name: Optional[str] = None
     family: Optional[SliceFamily] = None
     country: Optional[str] = None
+    deleted_at: Optional[datetime] = None
 
 
 # ---------- Resources ----------
