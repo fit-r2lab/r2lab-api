@@ -42,7 +42,8 @@ from r2lab_api.models.slice import Slice, SliceFamily
 # constants
 # ---------------------------------------------------------------------------
 
-SLICES_TO_SKIP = {"inria_r2lab.nightly", "inria_admin"}
+# SLICES_TO_SKIP = {"inria_r2lab.nightly", "inria_admin"}
+SLICES_TO_SKIP = set()  # no more skipping
 
 FORMER_DATA_DIR = Path(__file__).resolve().parent.parent / "former-data"
 
