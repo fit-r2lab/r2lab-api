@@ -35,11 +35,18 @@ def _slice_to_read(sl: Slice, db: Session) -> SliceRead:
     )
 
 
-@router.get("", response_model=list[SliceRead])
+@router.get("", response_model=list[SliceRead],
+            summary="List slices visible to the current user",
+            description=(
+                "**Admins** see all active slices "
+                "(pass `include_deleted=true` to also see soft-deleted ones). "
+                "**Regular users** see only the active slices they are a member of."
+            ))
 def list_slices(
     db: Session = Depends(get_db),
     current: User = Depends(get_current_user),
-    include_deleted: bool = Query(False),
+    include_deleted: bool = Query(
+        False, description="Admin only — include soft-deleted slices"),
 ):
     if current.is_admin:
         stmt = select(Slice)
@@ -109,7 +116,13 @@ def update_slice(
     return _slice_to_read(sl, db)
 
 
-@router.delete("/{slice_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{slice_id}", status_code=status.HTTP_204_NO_CONTENT,
+               summary="Soft-delete a slice",
+               description=(
+                   "Marks the slice as deleted (sets `deleted_at`). "
+                   "Existing leases are preserved for historical stats; "
+                   "memberships are cleared."
+               ))
 def delete_slice(
     slice_id: int,
     db: Session = Depends(get_db),

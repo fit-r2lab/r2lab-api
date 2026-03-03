@@ -34,7 +34,13 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED,
-             response_model=dict)
+             response_model=dict,
+             summary="Register a new account",
+             description=(
+                 "Creates a user with status **pending**. "
+                 "An admin must call `PATCH /users/{id}/approve` "
+                 "before the account can log in."
+             ))
 def register(body: RegisterRequest, db: Session = Depends(get_db)):
     existing = db.exec(select(User).where(User.email == body.email)).first()
     if existing:

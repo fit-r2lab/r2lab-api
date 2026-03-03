@@ -14,12 +14,19 @@ router = APIRouter(prefix="/stats", tags=["stats"])
 ALLOWED_PERIODS = {"day", "week", "month", "quarter", "year"}
 
 
-@router.get("/usage")
+@router.get("/usage",
+            summary="Aggregate usage statistics (public)",
+            description=(
+                "Returns total hours per slice (with family) in the given date range. "
+                "Pass `period` (`day`/`week`/`month`/`quarter`/`year`) to get "
+                "a per-period breakdown instead."
+            ))
 def usage(
     db: Session = Depends(get_db),
     t_from: datetime = Query(..., alias="from"),
     t_until: datetime = Query(..., alias="until"),
-    period: str | None = Query(None),
+    period: str | None = Query(
+        None, description="Group by time period: day, week, month, quarter, year"),
 ) -> list[UsageBySlice] | list[UsageByPeriod]:
     if period is not None and period not in ALLOWED_PERIODS:
         raise HTTPException(

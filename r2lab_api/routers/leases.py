@@ -78,15 +78,19 @@ def _check_overlap(db: Session, resource_id: int,
         )
 
 
-@router.get("", response_model=list[LeaseRead])
+@router.get("", response_model=list[LeaseRead],
+            summary="List leases (public)",
+            description="No authentication required. All filters are optional and combinable.")
 def list_leases(
     db: Session = Depends(get_db),
     resource_id: Optional[int] = Query(None),
     slice_id: Optional[int] = Query(None),
     alive: Optional[int] = Query(
         None, description="Unix epoch — return leases active at this time"),
-    after: Optional[datetime] = Query(None),
-    before: Optional[datetime] = Query(None),
+    after: Optional[datetime] = Query(
+        None, description="Only leases ending after this time (t_until > after)"),
+    before: Optional[datetime] = Query(
+        None, description="Only leases starting before this time (t_from < before)"),
 ):
     stmt = select(Lease)
     if resource_id is not None:
@@ -105,7 +109,9 @@ def list_leases(
     return [_lease_to_read(l, db) for l in leases]
 
 
-@router.get("/current", response_model=LeaseRead | None)
+@router.get("/current", response_model=LeaseRead | None,
+            summary="Get the currently active lease (public)",
+            description="Returns `null` if no lease is active right now on the given resource.")
 def get_current_lease(
     db: Session = Depends(get_db),
     resource_id: int = Query(...),
@@ -125,7 +131,13 @@ def get_current_lease(
 
 
 @router.post("", response_model=LeaseRead,
-             status_code=status.HTTP_201_CREATED)
+             status_code=status.HTTP_201_CREATED,
+             summary="Create a lease",
+             description=(
+                 "Caller must be a member of the target slice (or admin). "
+                 "Times must be aligned to the resource's granularity. "
+                 "Returns **409** if the new lease would overlap an existing one."
+             ))
 def create_lease(
     body: LeaseCreate,
     db: Session = Depends(get_db),

@@ -37,7 +37,12 @@ def get_user(
     return user
 
 
-@router.patch("/{user_id}", response_model=UserRead)
+@router.patch("/{user_id}", response_model=UserRead,
+              summary="Update a user",
+              description=(
+                  "Regular users can only update their own password. "
+                  "Admins can update any user and change the `is_admin` flag."
+              ))
 def update_user(
     user_id: int,
     body: UserUpdate,
