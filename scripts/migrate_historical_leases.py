@@ -177,9 +177,9 @@ def migrate(dry_run: bool = False):
             fam_enum = family_str_to_enum(fam_str)
 
             if name in existing_slices:
-                # update family on existing slices that still have the default
+                # CSV family is more authoritative than the PLC heuristic
                 sl = db.get(Slice, existing_slices[name])
-                if sl and sl.family == SliceFamily.unknown and fam_enum != SliceFamily.unknown:
+                if sl and fam_enum != SliceFamily.unknown and sl.family != fam_enum:
                     if not dry_run:
                         sl.family = fam_enum
                         db.add(sl)
