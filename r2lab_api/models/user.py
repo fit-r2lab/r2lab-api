@@ -15,6 +15,8 @@ class User(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     email: str = Field(unique=True, index=True)
     password_hash: str
+    first_name: Optional[str] = Field(default=None)
+    last_name: Optional[str] = Field(default=None)
     is_admin: bool = Field(default=False)
     status: UserStatus = Field(default=UserStatus.pending)
     created_at: datetime = Field(

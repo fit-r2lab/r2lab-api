@@ -40,7 +40,8 @@ def get_user(
 @router.patch("/{user_id}", response_model=UserRead,
               summary="Update a user",
               description=(
-                  "Regular users can only update their own password. "
+                  "Regular users can update their own profile "
+                  "(password, first/last name). "
                   "Admins can update any user and change the `is_admin` flag."
               ))
 def update_user(
@@ -57,6 +58,10 @@ def update_user(
         raise HTTPException(status_code=404, detail="User not found")
     if body.password is not None:
         user.password_hash = hash_password(body.password)
+    if body.first_name is not None:
+        user.first_name = body.first_name
+    if body.last_name is not None:
+        user.last_name = body.last_name
     if body.is_admin is not None:
         if not current.is_admin:
             raise HTTPException(status_code=403,

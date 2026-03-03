@@ -27,12 +27,16 @@ class RegisterRequest(BaseModel):
 class UserRead(BaseModel):
     id: int
     email: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
     is_admin: bool
     status: UserStatus
     created_at: datetime
 
 class UserUpdate(BaseModel):
     password: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
     is_admin: Optional[bool] = None
 
 
