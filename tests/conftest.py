@@ -4,6 +4,7 @@ Test infrastructure — SQLite in-memory, no PostgreSQL needed.
 The EXCLUDE constraint (overlap prevention) is PostgreSQL-specific and
 won't exist in SQLite. The app-level _check_overlap() is still tested.
 """
+import math
 import os
 
 # override settings BEFORE any app import
@@ -27,6 +28,29 @@ from r2lab_api.models.slice import Slice, SliceMember
 from r2lab_api.models.user import User, UserStatus
 
 
+def _sqlite_date_trunc(period, dt_str):
+    """Emulate PostgreSQL's date_trunc for SQLite tests."""
+    if dt_str is None:
+        return None
+    from datetime import timedelta as td
+    dt = datetime.fromisoformat(str(dt_str).replace("Z", "+00:00"))
+    if period == "day":
+        dt = dt.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif period == "week":
+        dt = (dt - td(days=dt.weekday())).replace(
+            hour=0, minute=0, second=0, microsecond=0)
+    elif period == "month":
+        dt = dt.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    elif period == "quarter":
+        qm = ((dt.month - 1) // 3) * 3 + 1
+        dt = dt.replace(
+            month=qm, day=1, hour=0, minute=0, second=0, microsecond=0)
+    elif period == "year":
+        dt = dt.replace(
+            month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    return dt.strftime("%Y-%m-%d %H:%M:%S")
+
+
 def _stamp_utc(instance, *_args):
     """After a row is loaded from SQLite, tag all naive datetimes as UTC."""
     for attr in vars(instance):
@@ -48,6 +72,14 @@ def engine_fixture():
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
+
+    def _register_sqlite_functions(dbapi_conn, _connection_record):
+        dbapi_conn.create_function(
+            "ceil", 1,
+            lambda x: math.ceil(x) if x is not None else None)
+        dbapi_conn.create_function("date_trunc", 2, _sqlite_date_trunc)
+
+    event.listen(engine, "connect", _register_sqlite_functions)
     SQLModel.metadata.create_all(engine)
     # patch naive datetimes from SQLite to be tz-aware (UTC)
     if not _utc_listeners_registered:
@@ -94,8 +126,11 @@ def _make_user(db, *, email, is_admin=False, status=UserStatus.approved):
     return user
 
 
-def _make_slice(db, *, name="test-slice"):
-    sl = Slice(name=name)
+def _make_slice(db, *, name="test-slice", family=None):
+    kwargs = {"name": name}
+    if family is not None:
+        kwargs["family"] = family
+    sl = Slice(**kwargs)
     db.add(sl)
     db.commit()
     db.refresh(sl)

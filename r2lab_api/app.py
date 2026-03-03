@@ -21,12 +21,13 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    from .routers import auth, users, slices, resources, leases
+    from .routers import auth, users, slices, resources, leases, stats
     app.include_router(auth.router)
     app.include_router(users.router)
     app.include_router(slices.router)
     app.include_router(resources.router)
     app.include_router(leases.router)
+    app.include_router(stats.router)
 
     return app
 

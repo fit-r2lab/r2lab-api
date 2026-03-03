@@ -95,3 +95,17 @@ class LeaseCreate(BaseModel):
 class LeaseUpdate(BaseModel):
     t_from: Optional[datetime] = None
     t_until: Optional[datetime] = None
+
+
+# ---------- Stats ----------
+
+class UsageBySlice(BaseModel):
+    family: str
+    slice_name: str
+    hours: int
+
+class UsageByPeriod(BaseModel):
+    family: str
+    slice_name: str
+    period: datetime
+    hours: int
