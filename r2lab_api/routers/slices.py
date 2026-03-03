@@ -29,6 +29,7 @@ def _slice_to_read(sl: Slice, db: Session) -> SliceRead:
     ]
     return SliceRead(
         id=sl.id, name=sl.name, family=sl.family,
+        country=sl.country,
         created_at=sl.created_at, member_ids=member_ids,
         deleted_at=sl.deleted_at,
     )
@@ -70,7 +71,7 @@ def create_slice(
     ).first()
     if existing:
         raise HTTPException(status_code=409, detail="Slice name already taken")
-    sl = Slice(name=body.name, family=body.family)
+    sl = Slice(name=body.name, family=body.family, country=body.country)
     db.add(sl)
     db.commit()
     db.refresh(sl)
@@ -99,6 +100,8 @@ def update_slice(
         sl.name = body.name
     if body.family is not None:
         sl.family = body.family
+    if body.country is not None:
+        sl.country = body.country
     sl.updated_at = datetime.now(timezone.utc)
     db.add(sl)
     db.commit()

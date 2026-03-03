@@ -28,6 +28,7 @@ class Slice(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     name: str = Field(index=True)
     family: SliceFamily = Field(default=SliceFamily.unknown)
+    country: Optional[str] = Field(default=None)
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(

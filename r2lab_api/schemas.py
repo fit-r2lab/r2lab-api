@@ -55,6 +55,7 @@ class SliceRead(BaseModel):
     id: int
     name: str
     family: SliceFamily
+    country: Optional[str] = None
     created_at: datetime
     member_ids: list[int] = []
     deleted_at: Optional[datetime] = None
@@ -62,10 +63,12 @@ class SliceRead(BaseModel):
 class SliceCreate(BaseModel):
     name: str
     family: SliceFamily = SliceFamily.unknown
+    country: Optional[str] = None
 
 class SliceUpdate(BaseModel):
     name: Optional[str] = None
     family: Optional[SliceFamily] = None
+    country: Optional[str] = None
 
 
 # ---------- Resources ----------

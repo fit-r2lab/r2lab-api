@@ -50,17 +50,17 @@ FORMER_DATA_DIR = Path(__file__).resolve().parent.parent / "former-data"
 # Granularity in seconds (10 minutes) — must match resource.granularity
 GRANULARITY = 600
 
-# Extra slice→family mappings for slices present in REBUILT-LEASES.csv
+# Extra slice→(family, country) mappings for slices present in REBUILT-LEASES.csv
 # but absent from HAND-SLICE-FAMILY.csv
-EXTRA_FAMILY = {
-    "inria_oaici": "academia/slices",
-    "inria_tum01": "academia/slices",
-    "inria_ter01": "academia/diana",
-    "inria_gitlabrunner": "academia/diana",
-    "inria_sopnode": "academia/slices",
-    "inria_vt1": "academia/others",
-    "inria_lille": "academia/slices",
-    "inria_tuvsud": "industry",
+EXTRA_SLICES = {
+    "inria_oaici": ("academia/slices", None),
+    "inria_tum01": ("academia/slices", "Germany"),
+    "inria_ter01": ("academia/diana", None),
+    "inria_gitlabrunner": ("academia/diana", None),
+    "inria_sopnode": ("academia/slices", None),
+    "inria_vt1": ("academia/others", None),
+    "inria_lille": ("academia/slices", None),
+    "inria_tuvsud": ("industry", "Germany"),
 }
 
 
@@ -123,15 +123,16 @@ def read_leases_csv(path: Path) -> list[dict]:
     return rows
 
 
-def read_family_csv(path: Path) -> dict[str, str]:
-    """Read HAND-SLICE-FAMILY.csv → {slice_name: family_string}."""
+def read_family_csv(path: Path) -> dict[str, tuple[str, str | None]]:
+    """Read HAND-SLICE-FAMILY.csv → {slice_name: (family, country)}."""
     mapping = {}
     with open(path, newline="") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            mapping[row["name"].strip()] = row["family"].strip()
+            country = row.get("country", "").strip() or None
+            mapping[row["name"].strip()] = (row["family"].strip(), country)
     # merge extra mappings
-    mapping.update(EXTRA_FAMILY)
+    mapping.update(EXTRA_SLICES)
     return mapping
 
 
@@ -168,28 +169,38 @@ def migrate(dry_run: bool = False):
             existing_slices[sl.name] = sl.id
 
         slices_created = 0
-        families_updated = 0
+        slices_updated = 0
         for name in csv_slice_names:
-            fam_str = family_map.get(name)
-            if fam_str is None:
+            csv_entry = family_map.get(name)
+            if csv_entry is None:
                 print(f"  WARNING: no family mapping for slice '{name}', "
                       f"using 'unknown'", file=sys.stderr)
-                fam_str = "unknown"
+                fam_str, country = "unknown", None
+            else:
+                fam_str, country = csv_entry
             fam_enum = family_str_to_enum(fam_str)
 
             if name in existing_slices:
-                # CSV family is more authoritative than the PLC heuristic
+                # CSV data is more authoritative than the PLC heuristic
                 sl = db.get(Slice, existing_slices[name])
-                if sl and fam_enum != SliceFamily.unknown and sl.family != fam_enum:
-                    if not dry_run:
+                if sl:
+                    changed = False
+                    if fam_enum != SliceFamily.unknown and sl.family != fam_enum:
                         sl.family = fam_enum
-                        db.add(sl)
-                    families_updated += 1
+                        changed = True
+                    if country and sl.country != country:
+                        sl.country = country
+                        changed = True
+                    if changed:
+                        if not dry_run:
+                            db.add(sl)
+                        slices_updated += 1
                 continue
 
             sl = Slice(
                 name=name,
                 family=fam_enum,
+                country=country,
                 created_at=now,
                 updated_at=now,
                 deleted_at=now,  # soft-deleted historical slice
@@ -205,8 +216,8 @@ def migrate(dry_run: bool = False):
             slices_created += 1
 
         print(f"Slices: {slices_created} created, "
-              f"{families_updated} families updated, "
-              f"{len(csv_slice_names) - slices_created - families_updated}"
+              f"{slices_updated} updated (family/country), "
+              f"{len(csv_slice_names) - slices_created - slices_updated}"
               f" unchanged")
 
         # ---- load existing leases into memory for overlap detection ----
