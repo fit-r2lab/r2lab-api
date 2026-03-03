@@ -9,6 +9,8 @@ DB_NAME="r2lab"
 DB_USER="r2lab"
 PLC_URL="postgresql://localhost/planetlab5"
 
+[ -d alembic ] || { echo "Run this from the r2lab-api root directory"; exit 1; }
+
 echo "=== Dropping and recreating database '${DB_NAME}' ==="
 dropdb --if-exists "$DB_NAME"
 createdb -O "$DB_USER" "$DB_NAME"
