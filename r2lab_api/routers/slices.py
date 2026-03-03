@@ -38,17 +38,21 @@ def _slice_to_read(sl: Slice, db: Session) -> SliceRead:
 @router.get("", response_model=list[SliceRead],
             summary="List slices visible to the current user",
             description=(
-                "**Admins** see all active slices "
+                "**Admins** see all active slices by default "
                 "(pass `include_deleted=true` to also see soft-deleted ones). "
-                "**Regular users** see only the active slices they are a member of."
+                "**Regular users** see only the active slices they are a member of. "
+                "Pass `mine=true` to restrict results to the caller's own slices "
+                "(useful for admins who are also slice members)."
             ))
 def list_slices(
     db: Session = Depends(get_db),
     current: User = Depends(get_current_user),
     include_deleted: bool = Query(
         False, description="Admin only — include soft-deleted slices"),
+    mine: bool = Query(
+        False, description="Only return slices the caller is a member of"),
 ):
-    if current.is_admin:
+    if current.is_admin and not mine:
         stmt = select(Slice)
         if not include_deleted:
             stmt = stmt.where(Slice.deleted_at == None)  # noqa: E711
