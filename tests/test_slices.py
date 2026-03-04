@@ -1,7 +1,9 @@
 """
-Slice tests — soft-delete, deleted_at via PATCH, authorization.
+Slice tests — soft-delete, deleted_at via PATCH, by-name lookup, authorization.
 """
 from datetime import datetime, timezone, timedelta
+
+from r2lab_api.models.slice import SliceFamily
 
 from tests.conftest import auth, _make_slice, _add_member, _make_resource
 
@@ -178,3 +180,78 @@ class TestSlicePatchDeletedAt:
             headers=auth(user_token),
         )
         assert r.status_code == 403
+
+
+# ---------- By-name lookup ----------
+
+class TestSliceByName:
+
+    def test_get_by_name(self, client, db, admin_token):
+        sl = _make_slice(db, name="lookup-me", family=SliceFamily.industry)
+        r = client.get(
+            "/slices/by-name/lookup-me", headers=auth(admin_token))
+        assert r.status_code == 200
+        assert r.json()["name"] == "lookup-me"
+        assert r.json()["family"] == "industry"
+
+    def test_get_by_name_not_found(self, client, db, admin_token):
+        r = client.get(
+            "/slices/by-name/no-such-slice", headers=auth(admin_token))
+        assert r.status_code == 404
+
+    def test_get_by_name_ignores_deleted(self, client, db, admin_token):
+        sl = _make_slice(db, name="gone-slice")
+        client.delete(f"/slices/{sl.id}", headers=auth(admin_token))
+        r = client.get(
+            "/slices/by-name/gone-slice", headers=auth(admin_token))
+        assert r.status_code == 404
+
+
+# ---------- PATCH by name ----------
+
+class TestSlicePatchByName:
+
+    def test_admin_patch_by_name(self, client, db, admin_token):
+        _make_slice(db, name="named-slice")
+        r = client.patch(
+            "/slices/by-name/named-slice",
+            json={"family": "industry"},
+            headers=auth(admin_token),
+        )
+        assert r.status_code == 200
+        assert r.json()["family"] == "industry"
+
+    def test_member_renew_by_name(
+        self, client, db, user_token, regular_user,
+    ):
+        sl = _make_slice(db, name="renew-me")
+        _add_member(db, sl.id, regular_user.id)
+        future = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
+        r = client.patch(
+            "/slices/by-name/renew-me",
+            json={"deleted_at": future},
+            headers=auth(user_token),
+        )
+        assert r.status_code == 200
+        assert r.json()["deleted_at"] is not None
+
+    def test_member_renew_by_name_rejected_too_far(
+        self, client, db, user_token, regular_user,
+    ):
+        sl = _make_slice(db, name="too-far")
+        _add_member(db, sl.id, regular_user.id)
+        too_far = (datetime.now(timezone.utc) + timedelta(days=90)).isoformat()
+        r = client.patch(
+            "/slices/by-name/too-far",
+            json={"deleted_at": too_far},
+            headers=auth(user_token),
+        )
+        assert r.status_code == 422
+
+    def test_patch_by_name_not_found(self, client, db, admin_token):
+        r = client.patch(
+            "/slices/by-name/nope",
+            json={"family": "industry"},
+            headers=auth(admin_token),
+        )
+        assert r.status_code == 404
