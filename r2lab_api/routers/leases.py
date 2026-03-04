@@ -136,31 +136,65 @@ def get_current_lease(
              description=(
                  "Caller must be a member of the target slice (or admin). "
                  "Times must be aligned to the resource's granularity. "
-                 "Returns **409** if the new lease would overlap an existing one."
+                 "Returns **409** if the new lease would overlap an existing one. "
+                 "Resource and slice can be specified by id or by name."
              ))
 def create_lease(
     body: LeaseCreate,
     db: Session = Depends(get_db),
     current: User = Depends(get_current_user),
 ):
-    resource = db.get(Resource, body.resource_id)
+    # resolve resource by id or name
+    if body.resource_id is not None and body.resource_name is not None:
+        raise HTTPException(
+            status_code=422,
+            detail="Provide resource_id or resource_name, not both")
+    if body.resource_id is not None:
+        resource = db.get(Resource, body.resource_id)
+    elif body.resource_name is not None:
+        resource = db.exec(
+            select(Resource).where(Resource.name == body.resource_name)
+        ).first()
+    else:
+        raise HTTPException(
+            status_code=422,
+            detail="Provide resource_id or resource_name")
     if not resource:
         raise HTTPException(status_code=404, detail="Resource not found")
-    sl = db.get(Slice, body.slice_id)
+
+    # resolve slice by id or name
+    if body.slice_id is not None and body.slice_name is not None:
+        raise HTTPException(
+            status_code=422,
+            detail="Provide slice_id or slice_name, not both")
+    if body.slice_id is not None:
+        sl = db.get(Slice, body.slice_id)
+    elif body.slice_name is not None:
+        sl = db.exec(
+            select(Slice).where(
+                Slice.name == body.slice_name,
+                Slice.deleted_at == None,  # noqa: E711
+            )
+        ).first()
+    else:
+        raise HTTPException(
+            status_code=422,
+            detail="Provide slice_id or slice_name")
     if not sl or sl.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Slice not found")
-    if not _user_in_slice(db, current, body.slice_id):
+
+    if not _user_in_slice(db, current, sl.id):
         raise HTTPException(status_code=403,
                             detail="You are not a member of this slice")
     if body.t_from >= body.t_until:
         raise HTTPException(status_code=422,
                             detail="t_from must be before t_until")
     _validate_granularity(resource, body.t_from, body.t_until)
-    _check_overlap(db, body.resource_id, body.t_from, body.t_until)
+    _check_overlap(db, resource.id, body.t_from, body.t_until)
 
     lease = Lease(
-        resource_id=body.resource_id,
-        slice_id=body.slice_id,
+        resource_id=resource.id,
+        slice_id=sl.id,
         t_from=body.t_from,
         t_until=body.t_until,
     )

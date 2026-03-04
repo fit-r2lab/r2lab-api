@@ -99,26 +99,33 @@ def get_slice(
     return _slice_to_read(sl, db)
 
 
-@router.patch("/{slice_id}", response_model=SliceRead,
-              summary="Update a slice",
-              description=(
-                  "Admins can update any field. "
-                  "Slice members can only set `deleted_at` (expiry), "
-                  "and only to a date within the next 61 days."
-              ))
-def update_slice(
-    slice_id: int,
-    body: SliceUpdate,
+@router.get("/by-name/{name}", response_model=SliceRead,
+            summary="Look up an active slice by name")
+def get_slice_by_name(
+    name: str,
     db: Session = Depends(get_db),
-    current: User = Depends(get_current_user),
+    _user: User = Depends(get_current_user),
 ):
-    sl = _get_active_slice(db, slice_id)
+    sl = db.exec(
+        select(Slice).where(
+            Slice.name == name,
+            Slice.deleted_at == None,  # noqa: E711
+        )
+    ).first()
+    if not sl:
+        raise HTTPException(status_code=404, detail="Slice not found")
+    return _slice_to_read(sl, db)
 
+
+def _apply_slice_update(
+    sl: Slice, body: SliceUpdate, db: Session, current: User,
+) -> SliceRead:
+    """Shared logic for PATCH by id and by name."""
     if not current.is_admin:
         # non-admin: must be a member
         is_member = db.exec(
             select(SliceMember)
-            .where(SliceMember.slice_id == slice_id,
+            .where(SliceMember.slice_id == sl.id,
                    SliceMember.user_id == current.id)
         ).first() is not None
         if not is_member:
@@ -154,6 +161,44 @@ def update_slice(
     db.commit()
     db.refresh(sl)
     return _slice_to_read(sl, db)
+
+
+_PATCH_DESC = (
+    "Admins can update any field. "
+    "Slice members can only set `deleted_at` (expiry), "
+    "and only to a date within the next 61 days."
+)
+
+
+@router.patch("/{slice_id}", response_model=SliceRead,
+              summary="Update a slice by id", description=_PATCH_DESC)
+def update_slice(
+    slice_id: int,
+    body: SliceUpdate,
+    db: Session = Depends(get_db),
+    current: User = Depends(get_current_user),
+):
+    sl = _get_active_slice(db, slice_id)
+    return _apply_slice_update(sl, body, db, current)
+
+
+@router.patch("/by-name/{name}", response_model=SliceRead,
+              summary="Update a slice by name", description=_PATCH_DESC)
+def update_slice_by_name(
+    name: str,
+    body: SliceUpdate,
+    db: Session = Depends(get_db),
+    current: User = Depends(get_current_user),
+):
+    sl = db.exec(
+        select(Slice).where(
+            Slice.name == name,
+            Slice.deleted_at == None,  # noqa: E711
+        )
+    ).first()
+    if not sl:
+        raise HTTPException(status_code=404, detail="Slice not found")
+    return _apply_slice_update(sl, body, db, current)
 
 
 @router.delete("/{slice_id}", status_code=status.HTTP_204_NO_CONTENT,

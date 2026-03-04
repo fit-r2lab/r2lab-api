@@ -21,6 +21,16 @@ def get_resource(resource_id: int, db: Session = Depends(get_db)):
     return resource
 
 
+@router.get("/by-name/{name}", response_model=ResourceRead)
+def get_resource_by_name(name: str, db: Session = Depends(get_db)):
+    resource = db.exec(
+        select(Resource).where(Resource.name == name)
+    ).first()
+    if not resource:
+        raise HTTPException(status_code=404, detail="Resource not found")
+    return resource
+
+
 @router.get("/{resource_id}/granularity")
 def get_granularity(resource_id: int, db: Session = Depends(get_db)):
     resource = db.get(Resource, resource_id)

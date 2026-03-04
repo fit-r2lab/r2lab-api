@@ -96,8 +96,10 @@ class LeaseRead(BaseModel):
     slice_name: Optional[str] = None
 
 class LeaseCreate(BaseModel):
-    resource_id: int
-    slice_id: int
+    resource_id: Optional[int] = None
+    resource_name: Optional[str] = None
+    slice_id: Optional[int] = None
+    slice_name: Optional[str] = None
     t_from: datetime
     t_until: datetime
 
