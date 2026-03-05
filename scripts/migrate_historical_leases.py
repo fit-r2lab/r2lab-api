@@ -27,7 +27,7 @@ Usage:
 import argparse
 import csv
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from sqlmodel import Session, select
@@ -253,12 +253,35 @@ def migrate(dry_run: bool = False):
         print(f"Leases surviving same-slice filter: {len(surviving)}")
 
         # ---- phase 2: resolve cross-slice overlaps ----
+        # Sort existing leases by t_from and use bisect to narrow
+        # candidates, avoiding an O(surviving × existing) full scan.
+        from bisect import bisect_left
+
+        sorted_existing = sorted(existing_leases, key=lambda le: le.t_from)
+        sorted_starts = [le.t_from for le in sorted_existing]
+
+        # Compute max lease duration so we can set a left bound:
+        # an existing lease starting before (beg - max_duration) can't
+        # possibly have t_until > beg.
+        max_duration = max(
+            (le.t_until - le.t_from for le in existing_leases),
+            default=timedelta(0),
+        )
+
         existing_adjustments: dict[int, tuple[datetime, datetime]] = {}
         cross_slice_adjustments = 0
 
         for row in surviving:
             beg, end = row["beg"], row["end"]
-            for existing in existing_leases:
+
+            # Window of existing leases that could overlap [beg, end):
+            #   t_from < end  (right bound)
+            #   t_from >= beg - max_duration  (left bound — earlier
+            #       leases are too short to reach beg)
+            left = bisect_left(sorted_starts, beg - max_duration)
+            right = bisect_left(sorted_starts, end)
+            for i in range(left, right):
+                existing = sorted_existing[i]
                 if existing.id in existing_adjustments:
                     e_from, e_until = existing_adjustments[existing.id]
                 else:
