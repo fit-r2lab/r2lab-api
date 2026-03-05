@@ -11,6 +11,7 @@ from ..models.resource import Resource
 from ..models.slice import Slice, SliceMember
 from ..models.user import User
 from ..schemas import LeaseCreate, LeaseRead, LeaseUpdate
+from .slices import _slice_is_active, _slice_is_active_filter
 
 router = APIRouter(prefix="/leases", tags=["leases"])
 
@@ -173,14 +174,14 @@ def create_lease(
         sl = db.exec(
             select(Slice).where(
                 Slice.name == body.slice_name,
-                Slice.deleted_at == None,  # noqa: E711
+                _slice_is_active_filter(),
             )
         ).first()
     else:
         raise HTTPException(
             status_code=422,
             detail="Provide slice_id or slice_name")
-    if not sl or sl.deleted_at is not None:
+    if not sl or not _slice_is_active(sl):
         raise HTTPException(status_code=404, detail="Slice not found")
 
     if not _user_in_slice(db, current, sl.id):

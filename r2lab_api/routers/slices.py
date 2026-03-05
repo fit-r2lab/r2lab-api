@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import or_
 from sqlmodel import Session, select
 
 from ..database import get_db
@@ -12,10 +13,24 @@ from ..schemas import SliceCreate, SliceRead, SliceUpdate
 router = APIRouter(prefix="/slices", tags=["slices"])
 
 
+def _slice_is_active_filter():
+    """SQL filter: deleted_at is NULL or in the future."""
+    now = datetime.now(timezone.utc)
+    return or_(Slice.deleted_at == None, Slice.deleted_at > now)  # noqa: E711
+
+
+def _slice_is_active(sl: Slice) -> bool:
+    """Python check: slice is active (not expired)."""
+    if sl.deleted_at is None:
+        return True
+    now = datetime.now(timezone.utc)
+    return sl.deleted_at > now
+
+
 def _get_active_slice(db: Session, slice_id: int) -> Slice:
-    """Return the slice if it exists and is not soft-deleted, else 404."""
+    """Return the slice if it exists and is active, else 404."""
     sl = db.get(Slice, slice_id)
-    if not sl or sl.deleted_at is not None:
+    if not sl or not _slice_is_active(sl):
         raise HTTPException(status_code=404, detail="Slice not found")
     return sl
 
@@ -55,13 +70,13 @@ def list_slices(
     if current.is_admin and not mine:
         stmt = select(Slice)
         if not include_deleted:
-            stmt = stmt.where(Slice.deleted_at == None)  # noqa: E711
+            stmt = stmt.where(_slice_is_active_filter())
     else:
         stmt = (
             select(Slice)
             .join(SliceMember)
             .where(SliceMember.user_id == current.id,
-                   Slice.deleted_at == None)  # noqa: E711
+                   _slice_is_active_filter())
         )
     slices = db.exec(stmt).all()
     return [_slice_to_read(s, db) for s in slices]
@@ -77,7 +92,7 @@ def create_slice(
     existing = db.exec(
         select(Slice).where(
             Slice.name == body.name,
-            Slice.deleted_at == None,  # noqa: E711
+            _slice_is_active_filter(),
         )
     ).first()
     if existing:
@@ -109,7 +124,7 @@ def get_slice_by_name(
     sl = db.exec(
         select(Slice).where(
             Slice.name == name,
-            Slice.deleted_at == None,  # noqa: E711
+            _slice_is_active_filter(),
         )
     ).first()
     if not sl:
@@ -193,7 +208,7 @@ def update_slice_by_name(
     sl = db.exec(
         select(Slice).where(
             Slice.name == name,
-            Slice.deleted_at == None,  # noqa: E711
+            _slice_is_active_filter(),
         )
     ).first()
     if not sl:
