@@ -254,13 +254,16 @@ def migrate(plc_data: dict, dry_run: bool = False):
                 slice_id_to_new_id[sid] = name_to_new_id[name]
                 continue
 
-            deleted_at = None
+            expires = to_utc(s["expires"])
             if s["is_deleted"]:
-                expires = to_utc(s["expires"])
+                # already deleted — use expires if in the past, otherwise now
                 if expires and expires < now:
                     deleted_at = expires
                 else:
                     deleted_at = now
+            else:
+                # active slice — carry over expires as the expiry date
+                deleted_at = expires
 
             sl = Slice(
                 name=name,
