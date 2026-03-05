@@ -349,7 +349,7 @@ def migrate(dry_run: bool = False):
             db.rollback()
         else:
             db.commit()
-            print(f"\nMigration committed successfully. "
+            print(f"\nMigration (2/2) committed successfully. "
                   f"Total new leases: {inserted}")
 
 

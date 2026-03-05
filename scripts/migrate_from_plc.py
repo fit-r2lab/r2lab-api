@@ -405,7 +405,7 @@ def migrate(plc_data: dict, dry_run: bool = False):
             db.rollback()
         else:
             db.commit()
-            print("\nMigration committed successfully.")
+            print("\nMigration (1/2) committed successfully.")
 
 
 # ---------------------------------------------------------------------------
