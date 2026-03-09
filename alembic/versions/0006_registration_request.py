@@ -36,7 +36,7 @@ def upgrade() -> None:
         sa.Column("admin_comment", sa.String, nullable=True),
     )
     op.create_index("ix_registration_request_email",
-                    "registration_request", ["email"], unique=True)
+                    "registration_request", ["email"])
 
 
 def downgrade() -> None:

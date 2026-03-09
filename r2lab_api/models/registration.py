@@ -16,7 +16,7 @@ class RegistrationRequest(SQLModel, table=True):
     __tablename__ = "registration_request"
 
     id: int | None = Field(default=None, primary_key=True)
-    email: str = Field(unique=True, index=True)
+    email: str = Field(index=True)
     first_name: str
     last_name: str
     affiliation: str
