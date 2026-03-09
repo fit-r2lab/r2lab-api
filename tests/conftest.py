@@ -23,6 +23,7 @@ from r2lab_api.app import create_app
 from r2lab_api.auth import create_token, hash_password
 from r2lab_api.database import get_db
 from r2lab_api.models.lease import Lease          # noqa: F401 — registers table
+from r2lab_api.models.registration import RegistrationRequest  # noqa: F401
 from r2lab_api.models.resource import Resource
 from r2lab_api.models.slice import Slice, SliceMember
 from r2lab_api.models.user import User, UserStatus
@@ -83,7 +84,8 @@ def engine_fixture():
     SQLModel.metadata.create_all(engine)
     # patch naive datetimes from SQLite to be tz-aware (UTC)
     if not _utc_listeners_registered:
-        for cls in (Lease, Slice, User, Resource, SliceMember):
+        for cls in (Lease, Slice, User, Resource, SliceMember,
+                    RegistrationRequest):
             event.listen(cls, "load", _stamp_utc)
             event.listen(cls, "refresh", _stamp_utc)
         _utc_listeners_registered = True
