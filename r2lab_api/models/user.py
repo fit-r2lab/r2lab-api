@@ -19,6 +19,8 @@ class User(SQLModel, table=True):
     last_name: Optional[str] = Field(default=None)
     is_admin: bool = Field(default=False)
     status: UserStatus = Field(default=UserStatus.pending)
+    password_reset_token: Optional[str] = Field(default=None)
+    token_expires_at: Optional[datetime] = Field(default=None)
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(
