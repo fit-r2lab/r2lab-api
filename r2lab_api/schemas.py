@@ -3,6 +3,7 @@ from typing import Optional
 
 from pydantic import BaseModel, EmailStr
 
+from .models.registration import RegistrationStatus
 from .models.slice import SliceFamily
 from .models.user import UserStatus
 
@@ -16,10 +17,6 @@ class LoginRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
-
-class RegisterRequest(BaseModel):
-    email: EmailStr
-    password: str
 
 
 # ---------- Users ----------
@@ -120,3 +117,32 @@ class UsageByPeriod(BaseModel):
     slice_name: str
     period: datetime
     hours: int
+
+
+# ---------- Registrations ----------
+
+class RegistrationSubmit(BaseModel):
+    email: EmailStr
+    first_name: str
+    last_name: str
+    affiliation: str
+    slice_name: Optional[str] = None
+    purpose: str
+
+class RegistrationRead(BaseModel):
+    id: int
+    email: str
+    first_name: str
+    last_name: str
+    affiliation: str
+    slice_name: Optional[str] = None
+    purpose: str
+    status: RegistrationStatus
+    created_at: datetime
+    verified_at: Optional[datetime] = None
+    decided_at: Optional[datetime] = None
+    admin_comment: Optional[str] = None
+
+class RegistrationDecision(BaseModel):
+    slice_name: Optional[str] = None
+    comment: Optional[str] = None
