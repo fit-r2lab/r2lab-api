@@ -115,17 +115,14 @@ def get_slice(
 
 
 @router.get("/by-name/{name}", response_model=SliceRead,
-            summary="Look up an active slice by name")
+            summary="Look up a slice by name (including deleted)")
 def get_slice_by_name(
     name: str,
     db: Session = Depends(get_db),
     _user: User = Depends(get_current_user),
 ):
     sl = db.exec(
-        select(Slice).where(
-            Slice.name == name,
-            _slice_is_active_filter(),
-        )
+        select(Slice).where(Slice.name == name)
     ).first()
     if not sl:
         raise HTTPException(status_code=404, detail="Slice not found")
@@ -206,10 +203,7 @@ def update_slice_by_name(
     current: User = Depends(get_current_user),
 ):
     sl = db.exec(
-        select(Slice).where(
-            Slice.name == name,
-            _slice_is_active_filter(),
-        )
+        select(Slice).where(Slice.name == name)
     ).first()
     if not sl:
         raise HTTPException(status_code=404, detail="Slice not found")

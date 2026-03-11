@@ -199,12 +199,14 @@ class TestSliceByName:
             "/slices/by-name/no-such-slice", headers=auth(admin_token))
         assert r.status_code == 404
 
-    def test_get_by_name_ignores_deleted(self, client, db, admin_token):
+    def test_get_by_name_includes_deleted(self, client, db, admin_token):
         sl = _make_slice(db, name="gone-slice")
         client.delete(f"/slices/{sl.id}", headers=auth(admin_token))
         r = client.get(
             "/slices/by-name/gone-slice", headers=auth(admin_token))
-        assert r.status_code == 404
+        assert r.status_code == 200
+        assert r.json()["name"] == "gone-slice"
+        assert r.json()["deleted_at"] is not None
 
 
 # ---------- PATCH by name ----------
