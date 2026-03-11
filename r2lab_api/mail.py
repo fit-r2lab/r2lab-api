@@ -8,6 +8,15 @@ log = logging.getLogger(__name__)
 
 
 def send_mail(to: str, subject: str, body: str) -> None:
+    if settings.mail_mode == "console":
+        print(f"\n{'=' * 60}")
+        print(f"  To: {to}")
+        print(f"  Subject: {subject}")
+        print(f"{'=' * 60}")
+        print(body)
+        print(f"{'=' * 60}\n")
+        return
+
     msg = MIMEText(body, "plain")
     msg["From"] = settings.mail_from
     msg["To"] = to
