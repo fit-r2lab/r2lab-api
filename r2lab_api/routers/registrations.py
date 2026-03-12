@@ -109,22 +109,18 @@ def verify_email(body: VerifyRequest, db: Session = Depends(get_db)):
     db.add(reg)
     db.commit()
 
-    # notify admins
-    admin_emails = db.exec(
-        select(User.email).where(User.is_admin == True)  # noqa: E712
-    ).all()
-    for admin_email in admin_emails:
-        send_mail(
-            to=admin_email,
-            subject="R2Lab — new registration pending review",
-            body=(
-                f"A new registration request from "
-                f"{reg.first_name} {reg.last_name} ({reg.email}) "
-                f"is awaiting admin review.\n\n"
-                f"Affiliation: {reg.affiliation}\n"
-                f"Purpose: {reg.purpose}\n"
-            ),
-        )
+    # notify admin mailing list
+    send_mail(
+        to=settings.admin_email,
+        subject="R2Lab — new registration pending review",
+        body=(
+            f"A new registration request from "
+            f"{reg.first_name} {reg.last_name} ({reg.email}) "
+            f"is awaiting admin review.\n\n"
+            f"Affiliation: {reg.affiliation}\n"
+            f"Purpose: {reg.purpose}\n"
+        ),
+    )
     return {"detail": "Email verified — your request is now pending admin review"}
 
 
