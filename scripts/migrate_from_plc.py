@@ -243,11 +243,17 @@ def migrate(plc_data: dict, dry_run: bool = False):
         print(f"SSH keys: {key_count}")
 
         # --- slices ---
+        IGNORED_PREFIXES = ("auto_", "wa8il8im88fe_", "il8im88ilab_")
         slice_id_to_new_id = {}  # PLC slice_id → new slice.id
         name_to_new_id = {}     # dedup: PLC may have several IDs per name
+        skipped_slices = 0
         for s in plc_data["slices"]:
             sid = s["slice_id"]
             name = s["name"].strip()
+
+            if name.startswith(IGNORED_PREFIXES):
+                skipped_slices += 1
+                continue
 
             # PLC can have duplicate names — reuse the first insert
             if name in name_to_new_id:
@@ -295,7 +301,8 @@ def migrate(plc_data: dict, dry_run: bool = False):
             unknown_slice.id if unknown_slice else -1
         )
 
-        print(f"Slices: {len(slice_id_to_new_id)}")
+        print(f"Slices: {len(slice_id_to_new_id)} mapped, "
+              f"{skipped_slices} skipped (ignored prefixes)")
 
         # --- slice memberships ---
         member_count = 0

@@ -11,6 +11,14 @@ PLC_URL="postgresql://localhost/planetlab5"
 
 [ -d alembic ] || { echo "Run this from the r2lab-api root directory"; exit 1; }
 
+echo "=== PREREQUISITES ==="
+echo " - [ ] PostgreSQL server running locally with a 'planetlab5' database"
+echo "       See ./scripts/postgres-catchup-macos.sh if needed"
+echo " - [ ] The r2lab database is not in use, i.e."
+echo "   - [ ] API server is not running"
+echo "   - [ ] No psql sessions are connected to the 'r2lab' database"
+
+
 echo "=== Dropping and recreating database '${DB_NAME}' ==="
 dropdb --if-exists "$DB_NAME"
 createdb -O "$DB_USER" "$DB_NAME"

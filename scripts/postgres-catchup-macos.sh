@@ -9,13 +9,16 @@ echo in $PWD
 
 # (1) to re-create the planetlab5 database from a more recent dump
 
-DATE=2026-03-05-12-19-05
-echo restoring planetlab5 from backup $DATE
+latest=$(ls -1 planetlab5.*.sql | tail -n 1)
+echo -n "latest backup is $latest; OK ? (Control-C to abort) "
+read
+# DATE=$(echo $latest | cut -d. -f2)
+# echo restoring planetlab5 from backup $DATE
 
-rsync -ai r2labapi:/var/lib/pgsql/backups/planetlab5.$DATE.sql .
+# rsync -ai r2labapi:/var/lib/pgsql/backups/planetlab5.$DATE.sql .
 
 dropdb planetlab5
 createdb planetlab5
-psql -U postgres -d planetlab5 < planetlab5.$DATE.sql
+psql -U postgres -d planetlab5 < $latest
 
 echo You should now re-run the migration script to produce the initial state of the r2lab database
