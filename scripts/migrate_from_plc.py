@@ -181,6 +181,13 @@ def migrate(plc_data: dict, dry_run: bool = False):
             if not email:
                 skipped_persons += 1
                 continue
+            # skip deleted persons and unvalidated registration requests
+            # (not enabled + never updated since creation)
+            if p["deleted"] or (
+                not p["enabled"] and p["date_created"] == p["last_updated"]
+            ):
+                skipped_persons += 1
+                continue
             # check for duplicates (PLC may have multiple rows for same email)
             existing = db.exec(
                 select(User).where(User.email == email)
