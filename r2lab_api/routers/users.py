@@ -3,6 +3,8 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
 
+from sqlalchemy import func
+
 from ..auth import hash_password
 from ..database import get_db
 from ..dependencies import get_current_user, require_admin
@@ -12,17 +14,37 @@ from ..schemas import SSHKeyCreate, SSHKeyRead, UserRead, UserUpdate
 router = APIRouter(prefix="/users", tags=["users"])
 
 
+def _user_to_read(user: User, db: Session) -> UserRead:
+    count = db.exec(
+        select(func.count()).where(SSHKey.user_id == user.id)
+    ).one()
+    return UserRead(
+        id=user.id,
+        email=user.email,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        is_admin=user.is_admin,
+        status=user.status,
+        created_at=user.created_at,
+        key_count=count,
+    )
+
+
 @router.get("", response_model=list[UserRead])
 def list_users(
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
-    return db.exec(select(User)).all()
+    users = db.exec(select(User)).all()
+    return [_user_to_read(u, db) for u in users]
 
 
 @router.get("/me", response_model=UserRead)
-def get_me(user: User = Depends(get_current_user)):
-    return user
+def get_me(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return _user_to_read(user, db)
 
 
 @router.get("/{user_id}", response_model=UserRead)
@@ -34,7 +56,7 @@ def get_user(
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    return user
+    return _user_to_read(user, db)
 
 
 @router.patch("/{user_id}", response_model=UserRead,
@@ -71,7 +93,7 @@ def update_user(
     db.add(user)
     db.commit()
     db.refresh(user)
-    return user
+    return _user_to_read(user, db)
 
 
 @router.patch("/{user_id}/approve", response_model=UserRead)
@@ -88,7 +110,7 @@ def approve_user(
     db.add(user)
     db.commit()
     db.refresh(user)
-    return user
+    return _user_to_read(user, db)
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)

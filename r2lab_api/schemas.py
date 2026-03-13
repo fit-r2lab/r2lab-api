@@ -29,6 +29,7 @@ class UserRead(BaseModel):
     is_admin: bool
     status: UserStatus
     created_at: datetime
+    key_count: int = 0
 
 class UserUpdate(BaseModel):
     password: Optional[str] = None
