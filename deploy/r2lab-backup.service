@@ -1,0 +1,7 @@
+[Unit]
+Description=R2Lab database backup
+
+[Service]
+Type=oneshot
+ExecStartPre=/usr/bin/mkdir -p /root/r2lab-backups
+ExecStart=/bin/bash -c 'sudo -u postgres pg_dump --format=custom --file=/root/r2lab-backups/r2lab.$(date +%%Y-%%m-%%d-%%H-%%M-%%S).pgdump r2lab'
