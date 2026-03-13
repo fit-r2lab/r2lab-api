@@ -7,8 +7,8 @@ from sqlmodel import Session, select
 from ..database import get_db
 from ..dependencies import get_current_user, require_admin
 from ..models.slice import Slice, SliceMember
-from ..models.user import User
-from ..schemas import SliceCreate, SliceRead, SliceUpdate
+from ..models.user import SSHKey, User
+from ..schemas import SliceCreate, SliceRead, SliceUpdate, SSHKeyRead
 
 router = APIRouter(prefix="/slices", tags=["slices"])
 
@@ -208,6 +208,23 @@ def update_slice_by_name(
     if not sl:
         raise HTTPException(status_code=404, detail="Slice not found")
     return _apply_slice_update(sl, body, db, current)
+
+
+@router.get("/by-name/{name}/keys", response_model=list[SSHKeyRead],
+            summary="List all SSH keys for all members of a slice")
+def list_slice_keys(
+    name: str,
+    db: Session = Depends(get_db),
+):
+    sl = db.exec(select(Slice).where(Slice.name == name)).first()
+    if not sl:
+        raise HTTPException(status_code=404, detail="Slice not found")
+    keys = db.exec(
+        select(SSHKey)
+        .join(SliceMember, SliceMember.user_id == SSHKey.user_id)
+        .where(SliceMember.slice_id == sl.id)
+    ).all()
+    return keys
 
 
 @router.delete("/{slice_id}", status_code=status.HTTP_204_NO_CONTENT,
