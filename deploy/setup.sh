@@ -14,19 +14,21 @@ set -euo pipefail
 DUMP=${1:?Usage: $0 <pgdump-file>}
 
 echo "=== Installing system packages ==="
-dnf install -y postgresql-server python3.12 python3.12-pip
+dnf install -y postgresql-server postgresql-contrib python3 python3-pip tar curl sudo
 
 echo "=== Initializing PostgreSQL ==="
 postgresql-setup --initdb 2>/dev/null || true
 systemctl enable --now postgresql
 
-echo "=== Installing uv ==="
-curl -LsSf https://astral.sh/uv/install.sh | sh
+if ! command -v uv &>/dev/null; then
+  echo "=== Installing uv ==="
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+fi
 export PATH="$HOME/.local/bin:$PATH"
 
 echo "=== Setting up Python venv and dependencies ==="
 cd /root/r2lab-api
-uv venv
+[[ -d .venv ]] || uv venv
 uv sync
 
 echo "=== Creating .env ==="
@@ -37,6 +39,10 @@ if [[ ! -f .env ]]; then
   sed -i "s/change-me-to-a-random-string/${JWT_SECRET}/" .env
   echo "Created .env — review and adjust settings in /root/r2lab-api/.env"
 fi
+
+# required for postgres to be able to run alembic migrations
+echo "=== Tweaking access rights for postgres in /root ==="
+chmod o+r,o+x /root
 
 echo "=== Restoring database ==="
 deploy/restore-db.sh "${DUMP}"
