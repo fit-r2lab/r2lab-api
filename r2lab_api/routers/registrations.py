@@ -224,11 +224,19 @@ def approve_registration(
         to=user.email,
         subject="R2Lab — your account has been approved",
         body=(
-            f"Hello {user.first_name},\n\n"
-            f"Your R2Lab account has been approved! "
-            f"Please set your password by clicking the link below:\n\n"
+            f"Dear {user.first_name},\n\n"
+            f"Thank you for your interest in the R2Lab testbed, "
+            f"we'd be glad to count you among our testbed users.\n\n"
+            f"First, please set your password by clicking the link below:\n\n"
             f"  {link}\n\n"
-            f"This link expires in 48 hours.\n"
+            f"This link expires in 48 hours.\n\n"
+            f"To start with R2Lab, we strongly advise you to take a look "
+            f"at our tutorials on https://r2lab.inria.fr/tutorial.md\n\n"
+            f"In case you need assistance, do not hesitate to contact us "
+            f"on the fit-r2lab-users@inria.fr mailing list. It is important "
+            f"to subscribe to the latter mailing list in order to receive "
+            f"up-to-date information -- low traffic list.\n\n"
+            f"Regards - the R2Lab support team\n"
         ),
     )
     return user
@@ -257,14 +265,15 @@ def reject_registration(
     db.add(reg)
     db.commit()
 
-    send_mail(
-        to=reg.email,
-        subject="R2Lab — registration update",
-        body=(
-            f"Hello {reg.first_name},\n\n"
-            f"Unfortunately, your registration request for R2Lab "
-            f"has not been approved.\n"
-            + (f"\nReason: {body.comment}\n" if body.comment else "")
-            + f"\nIf you have questions, please contact the R2Lab team.\n"
-        ),
-    )
+    # no email on rejection — most rejected requests are spam
+    # send_mail(
+    #     to=reg.email,
+    #     subject="R2Lab — registration update",
+    #     body=(
+    #         f"Hello {reg.first_name},\n\n"
+    #         f"Unfortunately, your registration request for R2Lab "
+    #         f"has not been approved.\n"
+    #         + (f"\nReason: {body.comment}\n" if body.comment else "")
+    #         + f"\nIf you have questions, please contact the R2Lab team.\n"
+    #     ),
+    # )
