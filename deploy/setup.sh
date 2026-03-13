@@ -47,13 +47,20 @@ chmod o+r,o+x /root
 echo "=== Restoring database ==="
 deploy/restore-db.sh "${DUMP}"
 
+echo "=== Installing backups-rotate ==="
+pip install backups-rotate
+ln -sf /root/r2lab-api/deploy/backups-rotate.yaml /etc/backups-rotate.yaml
+
 echo "=== Installing systemd services ==="
 ln -sf /root/r2lab-api/deploy/r2lab-api.service /etc/systemd/system/
 ln -sf /root/r2lab-api/deploy/r2lab-backup.service /etc/systemd/system/
 ln -sf /root/r2lab-api/deploy/r2lab-backup.timer /etc/systemd/system/
+ln -sf /root/r2lab-api/deploy/backups-rotate.service /etc/systemd/system/
+ln -sf /root/r2lab-api/deploy/backups-rotate.timer /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now r2lab-api
 systemctl enable --now r2lab-backup.timer
+systemctl enable --now backups-rotate.timer
 
 echo
 echo "=== Setup complete ==="

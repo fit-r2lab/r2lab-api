@@ -1,0 +1,9 @@
+[Unit]
+Description=invoke backups-rotate twice a day
+
+[Timer]
+OnCalendar=*-*-* 03,15:30
+Unit=backups-rotate.service
+
+[Install]
+WantedBy=multi-user.target

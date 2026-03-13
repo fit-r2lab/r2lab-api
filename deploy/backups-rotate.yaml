@@ -1,0 +1,13 @@
+---
+- name: r2lab-db
+  folder: /root/r2lab-backups
+  patterns:
+    - "r2lab*.pgdump"
+  datetime_format: "%Y-%m-%d-%H-%M-%S"
+  policy:
+    year: infinite
+    quarter: 3
+    month: 2
+    week: 4
+    day: 5
+    hour: 6
