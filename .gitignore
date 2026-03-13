@@ -10,3 +10,4 @@ former-data/
 .claude
 TODO.md
 *.pgdump
+.envrc
