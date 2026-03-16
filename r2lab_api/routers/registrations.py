@@ -220,24 +220,55 @@ def approve_registration(
 
     # send password setup email
     link = f"{settings.base_url}/set-password?token={raw_token}"
+    slice_info = (
+        f"You are now a member of slice '{slice_name}', please use this login for your experiments."
+    ) if slice_name else (
+        f"You don't have a slice yet ! Please contact the R2Lab support team to get one created for you."
+    )
+
     send_mail(
         to=user.email,
         subject="R2Lab — your account has been approved",
-        body=(
-            f"Dear {user.first_name},\n\n"
-            f"Thank you for your interest in the R2Lab testbed, "
-            f"we'd be glad to count you among our testbed users.\n\n"
-            f"First, please set your password by clicking the link below:\n\n"
-            f"  {link}\n\n"
-            f"This link expires in 48 hours.\n\n"
-            f"To start with R2Lab, we strongly advise you to take a look "
-            f"at our tutorials on https://r2lab.inria.fr/tutorial.md\n\n"
-            f"In case you need assistance, do not hesitate to contact us "
-            f"on the fit-r2lab-users@inria.fr mailing list. It is important "
-            f"to subscribe to the latter mailing list in order to receive "
-            f"up-to-date information -- low traffic list.\n\n"
-            f"Regards - the R2Lab support team\n"
-        ),
+        body=f"""Dear {user.first_name}
+
+Thank you for your interest in the R2Lab testbed, we'd be glad to count you among our testbed users.
+
+First, please set your password by clicking the link below (expires in 48 hours):
+
+  {link}
+
+Then use this password to login into the R2Lab portal at https://r2lab.inria.fr,
+where you can upload your ssh key and manage your reservations.
+
+{slice_info}
+
+
+To start with R2Lab, we strongly advise you to take a look at our tutorials
+on https://r2lab.inria.fr/tutorial.md
+
+
+Just a few words on the R2lab reservation policy
+
+R2lab usage is exclusive, when you have a valid reservation you are the only one allowed
+to use all the nodes in the platform. R2lab does not enforce any limitation on the duration
+or frequency of reservations. We expect however everyone to adhere to the following, common sense, rules:
+
+- Please do not reserve for more than 2 consecutive hours during daytime.
+- When reserving in advance, please create a maximum of 2 slices for one given day.
+- During the last half-hour of your reserved time, if there is no other reservation following the current slot,
+  it is OK to extend for another 2 hours, and so on.
+- Finally, if you are done early, then please just delete the current slot;
+  the software will then automatically shrink your lease (so that we keep track,
+  for accurate testbed usage statistics) and the testbed will become available to others.
+
+This reservation policy is also available online at https://r2lab.inria.fr/book.md#policy-details.
+
+
+In case you need assistance, do not hesitate to contact us on the fit-r2lab-users@inria.fr mailing list.
+It is important to subscribe to the latter mailing list in order to receive up-to-date information -- low traffic list.
+
+Regards - the R2Lab support team
+""",
     )
     return user
 
