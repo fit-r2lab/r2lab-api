@@ -243,8 +243,8 @@ where you can upload your ssh key and manage your reservations.
 {slice_info}
 
 
-To start with R2Lab, we strongly advise you to take a look at our tutorials
-on https://r2lab.inria.fr/tutorial.md
+To start with R2Lab, we strongly advise you to take a look at our tutorials on
+https://r2lab.inria.fr/tutorial.md
 
 
 Just a few words on the R2lab reservation policy
@@ -262,6 +262,11 @@ or frequency of reservations. We expect however everyone to adhere to the follow
   for accurate testbed usage statistics) and the testbed will become available to others.
 
 This reservation policy is also available online at https://r2lab.inria.fr/book.md#policy-details.
+
+
+If you are using R2lab for in your publications, please see the following link
+for guidelines on how to acknowledge R2lab in your papers:
+https://r2lab.inria.fr/papers.md#how-to-cite-r2lab
 
 
 In case you need assistance, do not hesitate to contact us on the fit-r2lab-users@inria.fr mailing list.
