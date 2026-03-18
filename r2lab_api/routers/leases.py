@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlmodel import Session, select
 
 from ..database import get_db
@@ -237,9 +237,10 @@ def update_lease(
     return _lease_to_read(lease, db)
 
 
-@router.delete("/{lease_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{lease_id}", response_model=LeaseRead | None)
 def delete_lease(
     lease_id: int,
+    response: Response,
     db: Session = Depends(get_db),
     current: User = Depends(get_current_user),
 ):
@@ -248,5 +249,35 @@ def delete_lease(
         raise HTTPException(status_code=404, detail="Lease not found")
     if not _user_in_slice(db, current, lease.slice_id):
         raise HTTPException(status_code=403, detail="Forbidden")
-    db.delete(lease)
+
+    now = datetime.now(timezone.utc)
+
+    # Fully in the past — refuse to touch
+    if lease.t_until <= now:
+        raise HTTPException(status_code=409,
+                            detail="Cannot delete a past lease")
+
+    # Fully in the future — hard delete
+    if lease.t_from >= now:
+        db.delete(lease)
+        db.commit()
+        response.status_code = status.HTTP_204_NO_CONTENT
+        return None
+
+    # In progress — shrink to latest grain boundary in the past
+    resource = db.get(Resource, lease.resource_id)
+    g = resource.granularity
+    now_ts = int(now.timestamp())
+    new_until_ts = now_ts - (now_ts % g)          # floor(now, grain)
+    t_from_ts = int(lease.t_from.timestamp())
+
+    # If that would collapse the lease, keep exactly one grain
+    if new_until_ts <= t_from_ts:
+        new_until_ts = t_from_ts + g
+
+    lease.t_until = datetime.fromtimestamp(new_until_ts, tz=timezone.utc)
+    db.add(lease)
     db.commit()
+    db.refresh(lease)
+    response.status_code = status.HTTP_200_OK
+    return _lease_to_read(lease, db)

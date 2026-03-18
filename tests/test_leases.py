@@ -2,6 +2,7 @@
 Lease API tests — happy paths, validation, authorization, soft-delete.
 """
 from datetime import datetime, timezone, timedelta
+from unittest.mock import patch
 
 import pytest
 
@@ -15,6 +16,11 @@ T0 = datetime(2026, 3, 1, 10, 0, tzinfo=timezone.utc)
 T1 = T0 + timedelta(minutes=10)
 T2 = T0 + timedelta(minutes=20)
 T3 = T0 + timedelta(minutes=30)
+
+# future times for delete tests
+F0 = datetime(2099, 1, 1, 10, 0, tzinfo=timezone.utc)
+F1 = F0 + timedelta(minutes=10)
+F2 = F0 + timedelta(minutes=20)
 
 
 # ---------- Happy paths ----------
@@ -126,9 +132,26 @@ class TestLeaseHappyPaths:
         assert r.status_code == 200
         assert r.json()["t_until"] == T2.isoformat().replace("+00:00", "Z")
 
-    def test_delete_lease(
+    def test_delete_future_lease(
         self, client, db, admin_token, resource, slice_obj,
     ):
+        """A fully future lease is hard-deleted."""
+        r = client.post("/leases", json={
+            "resource_id": resource.id,
+            "slice_id": slice_obj.id,
+            "t_from": F0.isoformat(),
+            "t_until": F1.isoformat(),
+        }, headers=auth(admin_token))
+        lid = r.json()["id"]
+        r = client.delete(f"/leases/{lid}", headers=auth(admin_token))
+        assert r.status_code == 204
+        r = client.get("/leases")
+        assert len(r.json()) == 0
+
+    def test_delete_past_lease_refused(
+        self, client, db, admin_token, resource, slice_obj,
+    ):
+        """A fully past lease cannot be deleted."""
         r = client.post("/leases", json={
             "resource_id": resource.id,
             "slice_id": slice_obj.id,
@@ -137,9 +160,63 @@ class TestLeaseHappyPaths:
         }, headers=auth(admin_token))
         lid = r.json()["id"]
         r = client.delete(f"/leases/{lid}", headers=auth(admin_token))
-        assert r.status_code == 204
+        assert r.status_code == 409
+        # lease is still there
         r = client.get("/leases")
-        assert len(r.json()) == 0
+        assert len(r.json()) == 1
+
+    def test_delete_in_progress_shrinks(
+        self, client, db, admin_token, resource, slice_obj,
+    ):
+        """An in-progress lease is shrunk to the latest grain boundary."""
+        # lease from F0 to F0+2h; we freeze "now" at F0+37min
+        t_from = F0
+        t_until = F0 + timedelta(hours=2)
+        fake_now = F0 + timedelta(minutes=37)
+        r = client.post("/leases", json={
+            "resource_id": resource.id,
+            "slice_id": slice_obj.id,
+            "t_from": t_from.isoformat(),
+            "t_until": t_until.isoformat(),
+        }, headers=auth(admin_token))
+        lid = r.json()["id"]
+        with patch("r2lab_api.routers.leases.datetime") as mock_dt:
+            mock_dt.now.return_value = fake_now
+            mock_dt.fromtimestamp = datetime.fromtimestamp
+            r = client.delete(f"/leases/{lid}", headers=auth(admin_token))
+        assert r.status_code == 200
+        data = r.json()
+        assert data["t_from"] == t_from.isoformat().replace("+00:00", "Z")
+        # floor(F0+37min, 10min) = F0+30min
+        expected_until = F0 + timedelta(minutes=30)
+        assert data["t_until"] == expected_until.isoformat().replace(
+            "+00:00", "Z")
+
+    def test_delete_in_progress_keeps_one_grain(
+        self, client, db, admin_token, resource, slice_obj,
+    ):
+        """If shrinking would collapse the lease, keep exactly one grain."""
+        t_from = F0
+        t_until = F0 + timedelta(hours=1)
+        # now is 7 minutes after t_from; floor(now) == t_from
+        fake_now = F0 + timedelta(minutes=7)
+        r = client.post("/leases", json={
+            "resource_id": resource.id,
+            "slice_id": slice_obj.id,
+            "t_from": t_from.isoformat(),
+            "t_until": t_until.isoformat(),
+        }, headers=auth(admin_token))
+        lid = r.json()["id"]
+        with patch("r2lab_api.routers.leases.datetime") as mock_dt:
+            mock_dt.now.return_value = fake_now
+            mock_dt.fromtimestamp = datetime.fromtimestamp
+            r = client.delete(f"/leases/{lid}", headers=auth(admin_token))
+        assert r.status_code == 200
+        data = r.json()
+        # kept exactly one grain: [F0, F0+10min)
+        expected_until = F0 + timedelta(minutes=10)
+        assert data["t_until"] == expected_until.isoformat().replace(
+            "+00:00", "Z")
 
 
 # ---------- Validation ----------
