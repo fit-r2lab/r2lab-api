@@ -8,7 +8,7 @@ Type=simple
 WorkingDirectory=/root/r2lab-api
 ExecStartPre=/root/r2lab-api/.venv/bin/alembic upgrade head
 # we bind localhost only so that caddy can reverse-proxy, it needs 80 to answer ACME challenges
-ExecStart=/root/r2lab-api/.venv/bin/uvicorn r2lab_api.app:app --port 80
+ExecStart=/root/r2lab-api/.venv/bin/uvicorn r2lab_api.app:app --port 9999
 Restart=on-failure
 RestartSec=5
 
