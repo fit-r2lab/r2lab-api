@@ -3,4 +3,4 @@ Description=invoke backups-rotate
 
 # keep backups during two months
 [Service]
-ExecStart=/root/venv-for-backups-rotate/bin/backups-rotate
+ExecStart=/bin/bash -c backups-rotate
