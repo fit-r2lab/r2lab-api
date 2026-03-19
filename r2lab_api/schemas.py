@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 
 from .models.registration import RegistrationStatus
 from .models.slice import SliceFamily
@@ -66,6 +66,13 @@ class SliceCreate(BaseModel):
     name: str
     family: SliceFamily = SliceFamily.unknown
     country: Optional[str] = None
+
+    @field_validator("name")
+    @classmethod
+    def name_must_contain_separator(cls, v: str) -> str:
+        if "-" not in v and "_" not in v:
+            raise ValueError("Slice name must contain a '-' or '_'")
+        return v
 
 class SliceUpdate(BaseModel):
     name: Optional[str] = None
