@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
@@ -79,19 +79,54 @@ def _check_overlap(db: Session, resource_id: int,
         )
 
 
+def _local_midnight(day: date, tz=None) -> datetime:
+    """Midnight local time on the given day, returned as UTC.
+    Uses the system local timezone unless *tz* is provided."""
+    local_midnight = datetime.combine(day, datetime.min.time())
+    if tz is not None:
+        local_midnight = local_midnight.replace(tzinfo=tz)
+    else:
+        local_midnight = local_midnight.astimezone()
+    return local_midnight.astimezone(timezone.utc)
+
+
+def _parse_time_param(value: str, param_name: str) -> datetime:
+    """Parse a time parameter: ISO datetime, 'now', 'today', or 'tomorrow'."""
+    if value == "now":
+        return datetime.now(timezone.utc)
+    if value == "today":
+        return _local_midnight(date.today())
+    if value == "tomorrow":
+        return _local_midnight(date.today() + timedelta(days=1))
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        raise HTTPException(
+            status_code=422,
+            detail=f"'{param_name}' must be an ISO datetime, "
+                   "'now', 'today', or 'tomorrow'",
+        )
+
+
 @router.get("", response_model=list[LeaseRead],
             summary="List leases (public)",
-            description="No authentication required. All filters are optional and combinable.")
+            description=(
+                "No authentication required. All filters are optional and combinable. "
+                "The `after` and `before` parameters accept ISO datetimes, "
+                "'now', or 'today' (midnight local time)."
+            ))
 def list_leases(
     db: Session = Depends(get_db),
     resource_id: Optional[int] = Query(None),
     slice_id: Optional[int] = Query(None),
     alive: Optional[int] = Query(
         None, description="Unix epoch — return leases active at this time"),
-    after: Optional[datetime] = Query(
-        None, description="Only leases ending after this time (t_until > after)"),
-    before: Optional[datetime] = Query(
-        None, description="Only leases starting before this time (t_from < before)"),
+    after: Optional[str] = Query(
+        None, description="Only leases ending after this time (t_until > after). "
+                          "Accepts ISO datetime, 'now', or 'today'."),
+    before: Optional[str] = Query(
+        None, description="Only leases starting before this time (t_from < before). "
+                          "Accepts ISO datetime, 'now', or 'today'."),
 ):
     stmt = select(Lease)
     if resource_id is not None:
@@ -102,9 +137,9 @@ def list_leases(
         at = datetime.fromtimestamp(alive, tz=timezone.utc)
         stmt = stmt.where(Lease.t_from <= at, Lease.t_until > at)
     if after is not None:
-        stmt = stmt.where(Lease.t_until > after)
+        stmt = stmt.where(Lease.t_until > _parse_time_param(after, "after"))
     if before is not None:
-        stmt = stmt.where(Lease.t_from < before)
+        stmt = stmt.where(Lease.t_from < _parse_time_param(before, "before"))
     stmt = stmt.order_by(Lease.t_from)
     leases = db.exec(stmt).all()
     return [_lease_to_read(l, db) for l in leases]
