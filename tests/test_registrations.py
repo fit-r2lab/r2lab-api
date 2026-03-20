@@ -98,7 +98,8 @@ class TestVerifyEmail:
         with patch("r2lab_api.routers.registrations.send_mail") as notify:
             client.post("/registrations/verify", json={"token": token})
         notify.assert_called_once()
-        assert notify.call_args.kwargs["to"] == admin_user.email
+        from r2lab_api.config import settings
+        assert notify.call_args.kwargs["to"] == settings.admin_email
 
     def test_verify_invalid_token(self, client, db):
         _submit(client)
@@ -279,7 +280,7 @@ class TestReject:
         assert reg["status"] == "rejected"
         assert reg["admin_comment"] == "No capacity"
 
-    def test_reject_sends_email(self, client, db, admin_token):
+    def test_reject_does_not_send_email(self, client, db, admin_token):
         self._pending_admin_reg(client, db)
         with patch("r2lab_api.routers.registrations.send_mail") as mock_mail:
             client.post(
@@ -287,8 +288,7 @@ class TestReject:
                 json={"comment": "No capacity"},
                 headers=auth(admin_token),
             )
-        mock_mail.assert_called_once()
-        assert mock_mail.call_args.kwargs["to"] == REG_DATA["email"]
+        mock_mail.assert_not_called()
 
     def test_reject_non_pending_rejected(self, client, db, admin_token):
         _submit(client)  # status = pending_email
