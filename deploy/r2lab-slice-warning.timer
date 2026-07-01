@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily R2Lab slice-expiry warning
+
+[Timer]
+# once a day; the script's rolling window assumes a single run per day
+OnCalendar=*-*-* 08:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

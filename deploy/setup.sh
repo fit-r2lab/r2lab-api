@@ -57,10 +57,13 @@ ln -sf /root/r2lab-api/deploy/r2lab-backup.service /etc/systemd/system/
 ln -sf /root/r2lab-api/deploy/r2lab-backup.timer /etc/systemd/system/
 ln -sf /root/r2lab-api/deploy/backups-rotate.service /etc/systemd/system/
 ln -sf /root/r2lab-api/deploy/backups-rotate.timer /etc/systemd/system/
+ln -sf /root/r2lab-api/deploy/r2lab-slice-warning.service /etc/systemd/system/
+ln -sf /root/r2lab-api/deploy/r2lab-slice-warning.timer /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now r2lab-api
 systemctl enable --now r2lab-backup.timer
 systemctl enable --now backups-rotate.timer
+systemctl enable --now r2lab-slice-warning.timer
 
 echo
 echo "=== Setup complete ==="

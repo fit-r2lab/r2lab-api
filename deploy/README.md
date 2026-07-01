@@ -56,6 +56,24 @@ deploy/restore-db.sh /root/r2lab-backups/r2lab.2026-03-13-14-00-00.pgdump
 systemctl restart r2lab-api
 ```
 
+## Slice-expiry warnings
+
+A systemd timer runs `scripts/warn-expiring-slices.py` once a day. It mails
+the members of every slice whose expiry (`deleted_at`) is in the future but
+within `WARNING_DAYS` (default 4) days, asking them to renew. Running once a
+day, each member gets one reminder per day over the slice's final few days.
+
+```bash
+# Check the timer status
+systemctl status r2lab-slice-warning.timer
+
+# Preview without sending any mail
+.venv/bin/python scripts/warn-expiring-slices.py --dry-run
+
+# Manually trigger a run
+systemctl start r2lab-slice-warning.service
+```
+
 ## Fedora / PostgreSQL major upgrade
 
 Fedora upgrades often bump the PostgreSQL major version, which makes
@@ -78,6 +96,8 @@ deploy/pg-upgrade.sh restore
 | `r2lab-api.service` | Systemd unit for the API (uvicorn on port 80) |
 | `r2lab-backup.service` | Oneshot that runs pg_dump |
 | `r2lab-backup.timer` | Triggers the backup every hour |
+| `r2lab-slice-warning.service` | Oneshot that warns members of soon-to-expire slices |
+| `r2lab-slice-warning.timer` | Triggers the slice-expiry warning once a day |
 | `.env.example` | Template for production configuration |
 | `setup.sh` | First-time setup script |
 | `restore-db.sh` | Restore database from a pgdump file |
