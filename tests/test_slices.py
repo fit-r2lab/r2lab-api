@@ -113,6 +113,49 @@ class TestSlicePatchDeletedAt:
         )
         assert r.status_code == 200
 
+    def test_admin_can_clear_deleted_at(
+        self, client, db, admin_token, slice_obj,
+    ):
+        """Clearing the expiry (deleted_at=null) must persist — regression
+        guard: a null was previously indistinguishable from an absent field."""
+        future = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
+        client.patch(
+            f"/slices/{slice_obj.id}",
+            json={"deleted_at": future},
+            headers=auth(admin_token),
+        )
+        r = client.patch(
+            f"/slices/{slice_obj.id}",
+            json={"deleted_at": None},
+            headers=auth(admin_token),
+        )
+        assert r.status_code == 200
+        assert r.json()["deleted_at"] is None
+        # and it stays cleared on a fresh read
+        r = client.get(
+            f"/slices/{slice_obj.id}", headers=auth(admin_token))
+        assert r.status_code == 200
+        assert r.json()["deleted_at"] is None
+
+    def test_patch_omitting_field_leaves_it_untouched(
+        self, client, db, admin_token, slice_obj,
+    ):
+        """A PATCH that omits deleted_at must not clear an existing expiry."""
+        future = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
+        client.patch(
+            f"/slices/{slice_obj.id}",
+            json={"deleted_at": future},
+            headers=auth(admin_token),
+        )
+        r = client.patch(
+            f"/slices/{slice_obj.id}",
+            json={"country": "fr"},
+            headers=auth(admin_token),
+        )
+        assert r.status_code == 200
+        assert r.json()["deleted_at"] is not None
+        assert r.json()["country"] == "fr"
+
     def test_member_can_set_deleted_at_within_61_days(
         self, client, db, user_token, regular_user, member_slice,
     ):
@@ -148,6 +191,23 @@ class TestSlicePatchDeletedAt:
         )
         assert r.status_code == 422
         assert "future" in r.json()["detail"]
+
+    def test_member_cannot_clear_deleted_at(
+        self, client, db, admin_token, user_token, regular_user, member_slice,
+    ):
+        """Members may not make a slice never-expire by clearing deleted_at."""
+        future = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
+        client.patch(
+            f"/slices/{member_slice.id}",
+            json={"deleted_at": future},
+            headers=auth(admin_token),
+        )
+        r = client.patch(
+            f"/slices/{member_slice.id}",
+            json={"deleted_at": None},
+            headers=auth(user_token),
+        )
+        assert r.status_code == 422
 
     def test_member_cannot_change_name(
         self, client, db, user_token, regular_user, member_slice,

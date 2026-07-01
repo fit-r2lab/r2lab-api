@@ -133,6 +133,8 @@ def _apply_slice_update(
     sl: Slice, body: SliceUpdate, db: Session, current: User,
 ) -> SliceRead:
     """Shared logic for PATCH by id and by name."""
+    # which fields the client actually sent (distinguishes absent from null)
+    fields_set = body.model_fields_set
     if not current.is_admin:
         # non-admin: must be a member
         is_member = db.exec(
@@ -143,12 +145,17 @@ def _apply_slice_update(
         if not is_member:
             raise HTTPException(status_code=403, detail="Forbidden")
         # non-admin can only touch deleted_at
-        if body.name is not None or body.family is not None or body.country is not None:
+        if fields_set - {"deleted_at"}:
             raise HTTPException(
                 status_code=403,
                 detail="Only admins can change name, family, or country")
-        # deleted_at must be within the next 61 days
-        if body.deleted_at is not None:
+        if "deleted_at" in fields_set:
+            # non-admins may not make a slice never-expire
+            if body.deleted_at is None:
+                raise HTTPException(
+                    status_code=422,
+                    detail="Only admins can clear the expiry date")
+            # deleted_at must be within the next 61 days
             now = datetime.now(timezone.utc)
             limit = now + timedelta(days=61)
             if body.deleted_at < now:
@@ -160,13 +167,13 @@ def _apply_slice_update(
                     status_code=422,
                     detail="deleted_at must be within the next 61 days")
 
-    if body.name is not None:
+    if "name" in fields_set:
         sl.name = body.name
-    if body.family is not None:
+    if "family" in fields_set:
         sl.family = body.family
-    if body.country is not None:
+    if "country" in fields_set:
         sl.country = body.country
-    if body.deleted_at is not None:
+    if "deleted_at" in fields_set:
         sl.deleted_at = body.deleted_at
     sl.updated_at = datetime.now(timezone.utc)
     db.add(sl)
