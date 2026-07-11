@@ -22,6 +22,7 @@ DESTINATIONS = [
     "turletti@gmail.com",
     "thierry.parmentelat@free.fr",
     "thierry.parmentelat@inria.fr",
+    "thierry.turletti@inria.fr",
 ]
 
 SUBJECT = "check mail from r2labapi"
