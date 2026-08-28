@@ -162,6 +162,86 @@ class TestAdminCRUD:
         assert len(r.json()) == 0
 
 
+# ---------- Forget / unforget ----------
+
+class TestForget:
+
+    def _verified_reg(self, client, db):
+        _, mock_mail = _submit(client)
+        token = _extract_token_from_mail(mock_mail)
+        with patch("r2lab_api.routers.registrations.send_mail"):
+            client.post("/registrations/verify", json={"token": token})
+
+    def test_forget_sets_reason(self, client, db, admin_token):
+        self._verified_reg(client, db)
+        r = client.post(
+            "/registrations/1/forget",
+            json={"reason": "duplicate"},
+            headers=auth(admin_token),
+        )
+        assert r.status_code == 200
+        assert r.json()["forget"] == "duplicate"
+
+    def test_forget_without_reason_defaults(self, client, db, admin_token):
+        self._verified_reg(client, db)
+        r = client.post(
+            "/registrations/1/forget",
+            json={},
+            headers=auth(admin_token),
+        )
+        assert r.status_code == 200
+        assert r.json()["forget"] == "forgotten"
+
+    def test_forgotten_excluded_from_default_list(
+        self, client, db, admin_token,
+    ):
+        self._verified_reg(client, db)
+        client.post(
+            "/registrations/1/forget",
+            json={"reason": "robot"},
+            headers=auth(admin_token),
+        )
+        r = client.get("/registrations", headers=auth(admin_token))
+        assert len(r.json()) == 0
+
+    def test_include_forgotten_shows_them(self, client, db, admin_token):
+        self._verified_reg(client, db)
+        client.post(
+            "/registrations/1/forget",
+            json={"reason": "robot"},
+            headers=auth(admin_token),
+        )
+        r = client.get(
+            "/registrations", params={"include_forgotten": True},
+            headers=auth(admin_token),
+        )
+        assert len(r.json()) == 1
+        assert r.json()[0]["forget"] == "robot"
+
+    def test_unforget_clears_reason(self, client, db, admin_token):
+        self._verified_reg(client, db)
+        client.post(
+            "/registrations/1/forget",
+            json={"reason": "robot"},
+            headers=auth(admin_token),
+        )
+        r = client.post(
+            "/registrations/1/unforget", headers=auth(admin_token),
+        )
+        assert r.status_code == 200
+        assert r.json()["forget"] is None
+        r = client.get("/registrations", headers=auth(admin_token))
+        assert len(r.json()) == 1
+
+    def test_forget_requires_admin(self, client, db, user_token):
+        r = client.post(
+            "/registrations/1/forget",
+            json={"reason": "duplicate"},
+            headers=auth(user_token),
+        )
+        assert r.status_code == 403
+
+
 # ---------- Approve ----------
 
 class TestApprove:

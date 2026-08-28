@@ -30,3 +30,4 @@ class RegistrationRequest(SQLModel, table=True):
     verified_at: Optional[datetime] = Field(default=None)
     decided_at: Optional[datetime] = Field(default=None)
     admin_comment: Optional[str] = Field(default=None)
+    forget: Optional[str] = Field(default=None)

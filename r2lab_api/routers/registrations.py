@@ -16,7 +16,8 @@ from ..models.registration import RegistrationRequest, RegistrationStatus
 from ..models.slice import Slice, SliceMember
 from ..models.user import User, UserStatus
 from ..schemas import (
-    RegistrationDecision, RegistrationRead, RegistrationSubmit, UserRead,
+    RegistrationDecision, RegistrationForget, RegistrationRead,
+    RegistrationSubmit, UserRead,
 )
 
 log = logging.getLogger(__name__)
@@ -130,12 +131,16 @@ def verify_email(body: VerifyRequest, db: Session = Depends(get_db)):
 def list_registrations(
     status_filter: RegistrationStatus | None = Query(
         None, alias="status"),
+    include_forgotten: bool = Query(
+        False, description="Admin only — include entries marked as forgotten"),
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
     stmt = select(RegistrationRequest)
     if status_filter:
         stmt = stmt.where(RegistrationRequest.status == status_filter)
+    if not include_forgotten:
+        stmt = stmt.where(RegistrationRequest.forget == None)  # noqa: E711
     return db.exec(stmt).all()
 
 
@@ -162,6 +167,39 @@ def delete_registration(
         raise HTTPException(status_code=404, detail="Registration not found")
     db.delete(reg)
     db.commit()
+
+
+@router.post("/{reg_id}/forget", response_model=RegistrationRead)
+def forget_registration(
+    reg_id: int,
+    body: RegistrationForget,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    reg = db.get(RegistrationRequest, reg_id)
+    if not reg:
+        raise HTTPException(status_code=404, detail="Registration not found")
+    reg.forget = body.reason or "forgotten"
+    db.add(reg)
+    db.commit()
+    db.refresh(reg)
+    return reg
+
+
+@router.post("/{reg_id}/unforget", response_model=RegistrationRead)
+def unforget_registration(
+    reg_id: int,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    reg = db.get(RegistrationRequest, reg_id)
+    if not reg:
+        raise HTTPException(status_code=404, detail="Registration not found")
+    reg.forget = None
+    db.add(reg)
+    db.commit()
+    db.refresh(reg)
+    return reg
 
 
 @router.post("/{reg_id}/approve", response_model=UserRead)

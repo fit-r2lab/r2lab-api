@@ -150,7 +150,11 @@ class RegistrationRead(BaseModel):
     verified_at: Optional[datetime] = None
     decided_at: Optional[datetime] = None
     admin_comment: Optional[str] = None
+    forget: Optional[str] = None
 
 class RegistrationDecision(BaseModel):
     slice_name: Optional[str] = None
     comment: Optional[str] = None
+
+class RegistrationForget(BaseModel):
+    reason: Optional[str] = None
