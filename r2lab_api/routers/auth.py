@@ -40,12 +40,21 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Account is {user.status.value}",
         )
+    if (body.duration_minutes is not None
+            and body.duration_minutes > settings.jwt_expire_minutes):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"duration_minutes cannot exceed "
+                f"{settings.jwt_expire_minutes}"
+            ),
+        )
     # transparently upgrade legacy MD5-crypt hashes to bcrypt
     if needs_rehash(user.password_hash):
         user.password_hash = hash_password(body.password)
         db.add(user)
         db.commit()
-    token = create_token(user.email)
+    token = create_token(user.email, body.duration_minutes)
     return TokenResponse(access_token=token)
 
 

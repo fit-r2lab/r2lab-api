@@ -35,9 +35,12 @@ def needs_rehash(hashed: str) -> bool:
     return hashed.startswith("$1$")
 
 
-def create_token(email: str) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(
-        minutes=settings.jwt_expire_minutes)
+def create_token(email: str, duration_minutes: int | None = None) -> str:
+    minutes = (
+        duration_minutes if duration_minutes is not None
+        else settings.jwt_expire_minutes
+    )
+    expire = datetime.now(timezone.utc) + timedelta(minutes=minutes)
     payload = {"sub": email, "exp": expire}
     return jwt.encode(payload, settings.jwt_secret,
                       algorithm=settings.jwt_algorithm)

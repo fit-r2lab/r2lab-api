@@ -13,6 +13,14 @@ from .models.user import UserStatus
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+    duration_minutes: Optional[int] = None
+
+    @field_validator("duration_minutes")
+    @classmethod
+    def duration_must_be_positive(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and v < 1:
+            raise ValueError("duration_minutes must be a positive integer")
+        return v
 
 class TokenResponse(BaseModel):
     access_token: str
