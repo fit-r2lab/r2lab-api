@@ -29,6 +29,30 @@ class ForgotPasswordRequest(BaseModel):
 
 @router.post("/login", response_model=TokenResponse)
 def login(body: LoginRequest, db: Session = Depends(get_db)):
+    """Exchange credentials for a bearer token.
+
+    The returned `access_token` is a JWT (`sub`=email, `exp`=expiry),
+    signed with a server-side secret (HS256). It is not encrypted:
+    any client can decode the payload locally without the secret —
+    only *verifying* the signature requires it, which is why clients
+    should treat the decoded claims as informational, not a
+    trust boundary check.
+
+    To inspect the claims without a JWT library:
+
+        import base64, json
+        payload_b64 = token.split(".")[1]
+        payload_b64 += "=" * (-len(payload_b64) % 4)  # pad
+        json.loads(base64.urlsafe_b64decode(payload_b64))
+        # => {"sub": "user@example.com", "exp": 1234567890}
+
+    By default the token is valid for `settings.jwt_expire_minutes`
+    (1 week). Pass `duration_minutes` in the request body to request
+    a shorter-lived token instead — useful for one-off checks where a
+    week-long credential would needlessly outlive its purpose. Values
+    above `jwt_expire_minutes` are rejected (400); the setting is a
+    ceiling, not a default to raise.
+    """
     user = db.exec(select(User).where(User.email == body.email)).first()
     if not user or not verify_password(body.password, user.password_hash):
         raise HTTPException(
