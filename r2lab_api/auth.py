@@ -35,22 +35,32 @@ def needs_rehash(hashed: str) -> bool:
     return hashed.startswith("$1$")
 
 
-def create_token(email: str, duration_minutes: int | None = None) -> str:
+def create_token(user_id: int, email: str, duration_minutes: int | None = None,
+                 audience: str | None = None) -> str:
     minutes = (
         duration_minutes if duration_minutes is not None
         else settings.jwt_expire_minutes
     )
     expire = datetime.now(timezone.utc) + timedelta(minutes=minutes)
-    payload = {"sub": email, "exp": expire}
+    payload = {
+        "sub": email,
+        "id": user_id,
+        "aud": audience or settings.jwt_audience,
+        "exp": expire,
+    }
     return jwt.encode(payload, settings.jwt_secret,
                       algorithm=settings.jwt_algorithm)
 
 
-def decode_token(token: str) -> str | None:
-    """Returns the email (sub) or None if invalid/expired."""
+def decode_token(token: str) -> dict | None:
+    """Returns the decoded payload, or None if the signature/expiry is
+    invalid. Does NOT enforce `aud` — callers that only trust tokens
+    scoped to this API (e.g. get_current_user) must check the `aud`
+    claim themselves, since third parties can request tokens carrying
+    a different audience via /auth/login."""
     try:
-        payload = jwt.decode(token, settings.jwt_secret,
-                             algorithms=[settings.jwt_algorithm])
-        return payload.get("sub")
+        return jwt.decode(token, settings.jwt_secret,
+                          algorithms=[settings.jwt_algorithm],
+                          options={"verify_aud": False})
     except jwt.PyJWTError:
         return None

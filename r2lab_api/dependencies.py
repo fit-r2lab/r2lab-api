@@ -3,6 +3,7 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlmodel import Session, select
 
 from .auth import decode_token
+from .config import settings
 from .database import get_db
 from .models.user import User, UserStatus
 
@@ -13,12 +14,18 @@ def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ) -> User:
-    email = decode_token(token)
-    if email is None:
+    payload = decode_token(token)
+    if payload is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
         )
+    if payload.get("aud") != settings.jwt_audience:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token audience not accepted by this API",
+        )
+    email = payload.get("sub")
     user = db.exec(select(User).where(User.email == email)).first()
     if user is None:
         raise HTTPException(

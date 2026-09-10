@@ -14,6 +14,7 @@ class LoginRequest(BaseModel):
     email: EmailStr
     password: str
     duration_minutes: Optional[int] = None
+    audience: Optional[str] = None
 
     @field_validator("duration_minutes")
     @classmethod

@@ -161,7 +161,7 @@ def admin_user(db):
 
 @pytest.fixture()
 def admin_token(admin_user):
-    return create_token(admin_user.email)
+    return create_token(admin_user.id, admin_user.email)
 
 
 @pytest.fixture()
@@ -171,7 +171,7 @@ def regular_user(db):
 
 @pytest.fixture()
 def user_token(regular_user):
-    return create_token(regular_user.email)
+    return create_token(regular_user.id, regular_user.email)
 
 
 @pytest.fixture()

@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     jwt_secret: str = "change-me-in-production"
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 10080  # 1 week
+    jwt_audience: str = "r2lab.inria.fr"
     mail_mode: str = "smtp"  # "smtp" or "console"
     smtp_host: str = "localhost"
     smtp_port: int = 25
